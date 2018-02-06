@@ -371,7 +371,7 @@ def combine(pmaps):
 
 def compress(dic):
     """
-    Compress a dictionary of ProbabilityMaps
+    Compress a dictionary of ProbabilityMaps by removing the zeros
     """
     newdic = AccumDict()
     vars(newdic).update(vars(dic))
