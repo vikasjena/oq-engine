@@ -160,7 +160,7 @@ class EventBasedRuptureCalculator(base.HazardCalculator):
 
         def weight(src):
             return src.num_ruptures * src.RUPTURE_WEIGHT
-        src_filter = SourceFilter(self.sitecol, oq.maximum_distance)
+        src_filter = SourceFilter(self.sitecol.complete, oq.maximum_distance)
         csm = self.filter_csm(src_filter)
         maxweight = csm.get_maxweight(weight, oq.concurrent_tasks or 1)
         logging.info('Using maxweight=%d', maxweight)

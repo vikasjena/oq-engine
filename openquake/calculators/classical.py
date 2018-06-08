@@ -164,7 +164,7 @@ class PSHACalculator(base.HazardCalculator):
         minweight = source.MINWEIGHT * math.sqrt(len(self.sitecol))
         num_tasks = 0
         num_sources = 0
-        src_filter = SourceFilter(self.sitecol, oq.maximum_distance)
+        src_filter = SourceFilter(self.sitecol.complete, oq.maximum_distance)
         csm = self.filter_csm(src_filter)
         maxweight = csm.get_maxweight(weight, oq.concurrent_tasks, minweight)
         if maxweight == minweight:
