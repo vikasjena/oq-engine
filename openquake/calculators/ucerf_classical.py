@@ -25,7 +25,6 @@ from openquake.commonlib import source
 from openquake.calculators import base
 from openquake.calculators.classical import ClassicalCalculator, PSHACalculator
 from openquake.calculators.ucerf_base import UcerfFilter
-# FIXME: the counting of effective ruptures has to be revised
 
 
 @base.calculators.add('ucerf_psha')
@@ -37,6 +36,7 @@ class UcerfPSHACalculator(PSHACalculator):
         super().pre_execute()
         self.src_filter = UcerfFilter(
             self.sitecol, self.oqparam.maximum_distance)
+        self.csm = self.filter_csm(self.src_filter)
         for sm in self.csm.source_models:  # one branch at the time
             [grp] = sm.src_groups
             ucerf = grp.sources[0].orig

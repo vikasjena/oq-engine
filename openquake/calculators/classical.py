@@ -25,6 +25,7 @@ from openquake.baselib import parallel, hdf5
 from openquake.baselib.python3compat import encode
 from openquake.baselib.general import AccumDict, block_splitter, groupby
 from openquake.hazardlib.calc.hazard_curve import classical, ProbabilityMap
+from openquake.hazardlib.calc.filters import SourceFilter
 from openquake.hazardlib.stats import compute_pmap_stats
 from openquake.hazardlib import source
 from openquake.calculators import getters
@@ -96,7 +97,10 @@ class PSHACalculator(base.HazardCalculator):
                 self.nsites.append(len(pmap_by_grp[grp_id]))
             for srcid, (srcweight, nsites, calc_time, split) in \
                     pmap_by_grp.calc_times.items():
-                info = self.csm.infos[srcid]
+                try:
+                    info = self.csm.infos[srcid]
+                except KeyError:  # required for UCERF
+                    continue
                 info.num_sites += nsites
                 info.calc_time += calc_time
                 info.num_split += split
@@ -160,7 +164,8 @@ class PSHACalculator(base.HazardCalculator):
         minweight = source.MINWEIGHT * math.sqrt(len(self.sitecol))
         num_tasks = 0
         num_sources = 0
-        csm, src_filter = self.filter_csm()
+        src_filter = SourceFilter(self.sitecol, oq.maximum_distance)
+        csm = self.filter_csm(src_filter)
         maxweight = csm.get_maxweight(weight, oq.concurrent_tasks, minweight)
         if maxweight == minweight:
             logging.info('Using minweight=%d', minweight)

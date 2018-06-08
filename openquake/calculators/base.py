@@ -32,7 +32,6 @@ from openquake.baselib import (
     config, general, hdf5, datastore, __version__ as engine_version)
 from openquake.baselib.performance import Monitor
 from openquake.hazardlib.calc.filters import SourceFilter, RtreeFilter, rtree
-from openquake.hazardlib.source.base import BaseSeismicSource
 from openquake.risklib import riskinput, riskmodels
 from openquake.commonlib import readinput, source, calc, writers
 from openquake.baselib.parallel import Starmap
@@ -322,16 +321,15 @@ class HazardCalculator(BaseCalculator):
     """
     precalc = None
 
-    def filter_csm(self):
+    def filter_csm(self, src_filter):
         """
         :returns: (filtered CompositeSourceModel, SourceFilter)
         """
         oq = self.oqparam
         mon = self.monitor('prefilter')
         self.hdf5cache = self.datastore.hdf5cache()
-        src_filter = SourceFilter(self.sitecol.complete, oq.maximum_distance,
-                                  self.hdf5cache)
-        if (oq.prefilter_sources == 'numpy' or rtree is None):
+        if (oq.prefilter_sources == 'numpy' or rtree is None or
+                oq.calculation_mode == 'ucerf_classical'):
             csm = self.csm.filter(src_filter, mon)
         elif oq.prefilter_sources == 'rtree':
             prefilter = RtreeFilter(self.sitecol.complete, oq.maximum_distance,
@@ -339,7 +337,7 @@ class HazardCalculator(BaseCalculator):
             csm = self.csm.filter(prefilter, mon)
         else:  # prefilter_sources='no'
             csm = self.csm.filter(SourceFilter(None, {}), mon)
-        return csm, src_filter
+        return csm
 
     def can_read_parent(self):
         """
