@@ -110,7 +110,10 @@ class UcerfFilter(SourceFilter):
     """
     def filter(self, srcs):
         for src in srcs:
-            if hasattr(src, 'start'):  # fault sources
+            if hasattr(src, 'indices'):   # already filtered
+                yield src
+                continue
+            elif hasattr(src, 'start'):  # fault sources
                 src.src_filter = self  # hack: needed for .iter_ruptures
                 ridx = set()
                 for idx in range(src.start, src.stop):
