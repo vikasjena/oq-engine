@@ -3,8 +3,8 @@ Scenario Risk with site model
 
 ============== ===================
 checksum32     1,603,095,237      
-date           2018-02-02T16:04:44
-engine_version 2.9.0-gitd6a3184   
+date           2018-06-05T06:40:10
+engine_version 3.2.0-git65c4735   
 ============== ===================
 
 num_sites = 11, num_levels = 106
@@ -23,8 +23,10 @@ complex_fault_mesh_spacing      2.0
 width_of_mfd_bin                None              
 area_source_discretization      None              
 ground_motion_correlation_model 'JB2009'          
+minimum_intensity               {}                
 random_seed                     42                
 master_seed                     0                 
+ses_seed                        42                
 avg_losses                      True              
 =============================== ==================
 
@@ -42,11 +44,11 @@ structural_vulnerability `structural_vulnerability_model.xml <structural_vulnera
 
 Composite source model
 ----------------------
-========= ====== =============== ================
-smlt_path weight gsim_logic_tree num_realizations
-========= ====== =============== ================
-b_1       1.000  trivial(1)      1/1             
-========= ====== =============== ================
+========= ======= =============== ================
+smlt_path weight  gsim_logic_tree num_realizations
+========= ======= =============== ================
+b_1       1.00000 trivial(1)      1/1             
+========= ======= =============== ================
 
 Realizations per (TRT, GSIM)
 ----------------------------
@@ -56,40 +58,34 @@ Realizations per (TRT, GSIM)
   <RlzsAssoc(size=1, rlzs=1)
   0,AkkarEtAlRjb2014(): [0]>
 
-Informational data
-------------------
-================ ================
-hostname         tstation.gem.lan
-require_epsilons True            
-================ ================
-
 Exposure model
 --------------
 =============== ========
-#assets         18      
+#assets         11      
 #taxonomies     4       
 deductibile     absolute
 insurance_limit absolute
 =============== ========
 
-======== ===== ====== === === ========= ==========
-taxonomy mean  stddev min max num_sites num_assets
-1        1.111 0.333  1   2   9         10        
-2        1.000 NaN    1   1   1         1         
-3        1.000 0.0    1   1   4         4         
-4        1.000 0.0    1   1   3         3         
-*ALL*    1.059 0.243  1   2   17        18        
-======== ===== ====== === === ========= ==========
+============ ======= ====== === === ========= ==========
+taxonomy     mean    stddev min max num_sites num_assets
+EMCA_PRIM_2L 1.00000 0.0    1   1   4         4         
+EMCA_PRIM_4L 1.00000 NaN    1   1   1         1         
+concrete_spl 1.00000 0.0    1   1   3         3         
+steel_spl    1.00000 0.0    1   1   3         3         
+*ALL*        1.00000 0.0    1   1   11        11        
+============ ======= ====== === === ========= ==========
 
 Slowest operations
 ------------------
 ======================= ========= ========= ======
 operation               time_sec  memory_mb counts
 ======================= ========= ========= ======
-building riskinputs     0.035     0.0       1     
-reading exposure        0.024     0.0       1     
-saving gmfs             0.008     0.0       1     
-computing gmfs          0.004     0.0       1     
-building epsilons       4.997E-04 0.0       1     
-reading site collection 6.437E-06 0.0       1     
+ScenarioCalculator.run  0.27205   0.00391   1     
+reading site collection 0.05950   0.0       1     
+building riskinputs     0.03101   0.0       1     
+saving gmfs             0.00814   0.0       1     
+computing gmfs          0.00479   0.0       1     
+reading exposure        0.00188   0.0       1     
+building epsilons       6.657E-04 0.0       1     
 ======================= ========= ========= ======

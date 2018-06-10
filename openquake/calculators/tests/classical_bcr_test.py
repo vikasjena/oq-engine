@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 #
-# Copyright (C) 2015-2017 GEM Foundation
+# Copyright (C) 2015-2018 GEM Foundation
 #
 # OpenQuake is free software: you can redistribute it and/or modify it
 # under the terms of the GNU Affero General Public License as published
@@ -32,6 +32,11 @@ class ClassicalBCRTestCase(CalculatorTestCase):
 
     @attr('qa', 'risk', 'classical_bcr')
     def test_case_2(self):
+        # test with the exposure in CSV format
+        self.run_calc(case_2.__file__, 'job.ini',
+                      exposure_file='exposure_model-header.xml')
+
+        # test with the exposure in XML format
         out = self.run_calc(case_2.__file__, 'job.ini', exports='csv')
         fnames = out['bcr-stats', 'csv']
         assert fnames

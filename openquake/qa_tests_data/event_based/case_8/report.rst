@@ -2,9 +2,9 @@ Event Based from NonParametric source
 =====================================
 
 ============== ===================
-checksum32     2,117,452,566      
-date           2018-02-02T16:03:53
-engine_version 2.9.0-gitd6a3184   
+checksum32     103,533,850        
+date           2018-06-05T06:39:51
+engine_version 3.2.0-git65c4735   
 ============== ===================
 
 num_sites = 3, num_levels = 7
@@ -16,15 +16,17 @@ calculation_mode                'event_based_rupture'
 number_of_logic_tree_samples    0                    
 maximum_distance                {'default': 500.0}   
 investigation_time              50.0                 
-ses_per_logic_tree_path         1                    
+ses_per_logic_tree_path         2                    
 truncation_level                3.0                  
 rupture_mesh_spacing            5.0                  
 complex_fault_mesh_spacing      5.0                  
 width_of_mfd_bin                0.3                  
-area_source_discretization      10.0                 
+area_source_discretization      20.0                 
 ground_motion_correlation_model None                 
+minimum_intensity               {}                   
 random_seed                     23                   
 master_seed                     0                    
+ses_seed                        42                   
 =============================== =====================
 
 Input files
@@ -38,11 +40,36 @@ source                  `source_model.xml <source_model.xml>`_
 source_model_logic_tree `source_model_logic_tree.xml <source_model_logic_tree.xml>`_
 ======================= ============================================================
 
+Composite source model
+----------------------
+========= ======= =============== ================
+smlt_path weight  gsim_logic_tree num_realizations
+========= ======= =============== ================
+b1        1.00000 trivial(1)      1/1             
+========= ======= =============== ================
+
+Required parameters per tectonic region type
+--------------------------------------------
+====== ================= =========== ======================= =================
+grp_id gsims             distances   siteparams              ruptparams       
+====== ================= =========== ======================= =================
+0      ChiouYoungs2008() rjb rrup rx vs30 vs30measured z1pt0 dip mag rake ztor
+====== ================= =========== ======================= =================
+
+Realizations per (TRT, GSIM)
+----------------------------
+
+::
+
+  <RlzsAssoc(size=1, rlzs=1)
+  0,ChiouYoungs2008(): [0]>
+
 Slowest operations
 ------------------
 ============================== ========= ========= ======
 operation                      time_sec  memory_mb counts
 ============================== ========= ========= ======
-reading composite source model 0.041     0.0       1     
-reading site collection        4.840E-05 0.0       1     
+reading composite source model 0.08029   0.0       1     
+reading site collection        4.268E-04 0.0       1     
+splitting sources              3.202E-04 0.0       1     
 ============================== ========= ========= ======

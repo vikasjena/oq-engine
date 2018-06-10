@@ -2,9 +2,9 @@ Scenario Damage
 ===============
 
 ============== ===================
-checksum32     272,505,614        
-date           2018-02-02T16:02:35
-engine_version 2.9.0-gitd6a3184   
+checksum32     2,048,857,716      
+date           2018-06-05T06:38:21
+engine_version 3.2.0-git65c4735   
 ============== ===================
 
 num_sites = 1, num_levels = 26
@@ -23,8 +23,10 @@ complex_fault_mesh_spacing      2.0
 width_of_mfd_bin                None              
 area_source_discretization      None              
 ground_motion_correlation_model 'JB2009'          
+minimum_intensity               {}                
 random_seed                     42                
 master_seed                     0                 
+ses_seed                        42                
 =============================== ==================
 
 Input files
@@ -41,11 +43,11 @@ structural_fragility `fragility_model.xml <fragility_model.xml>`_
 
 Composite source model
 ----------------------
-========= ====== =============== ================
-smlt_path weight gsim_logic_tree num_realizations
-========= ====== =============== ================
-b_1       1.000  trivial(1)      1/1             
-========= ====== =============== ================
+========= ======= =============== ================
+smlt_path weight  gsim_logic_tree num_realizations
+========= ======= =============== ================
+b_1       1.00000 trivial(1)      1/1             
+========= ======= =============== ================
 
 Realizations per (TRT, GSIM)
 ----------------------------
@@ -54,13 +56,6 @@ Realizations per (TRT, GSIM)
 
   <RlzsAssoc(size=1, rlzs=1)
   0,BooreAtkinson2008(): [0]>
-
-Informational data
-------------------
-================ ================
-hostname         tstation.gem.lan
-require_epsilons False           
-================ ================
 
 Exposure model
 --------------
@@ -71,20 +66,20 @@ deductibile     absolute
 insurance_limit absolute
 =============== ========
 
-======== ===== ====== === === ========= ==========
-taxonomy mean  stddev min max num_sites num_assets
-1        1.000 NaN    1   1   1         1         
-======== ===== ====== === === ========= ==========
+======== ======= ====== === === ========= ==========
+taxonomy mean    stddev min max num_sites num_assets
+Wood     1.00000 NaN    1   1   1         1         
+======== ======= ====== === === ========= ==========
 
 Slowest operations
 ------------------
 ======================= ========= ========= ======
 operation               time_sec  memory_mb counts
 ======================= ========= ========= ======
-saving gmfs             0.007     0.0       1     
-building riskinputs     0.003     0.0       1     
-reading exposure        0.002     0.0       1     
-computing gmfs          0.002     0.0       1     
-assoc_assets_sites      0.002     0.0       1     
-reading site collection 2.153E-04 0.0       1     
+ScenarioCalculator.run  0.16233   0.32812   1     
+reading site collection 0.00911   0.0       1     
+building riskinputs     0.00691   0.0       1     
+saving gmfs             0.00411   0.0       1     
+computing gmfs          0.00283   0.08984   1     
+reading exposure        7.317E-04 0.0       1     
 ======================= ========= ========= ======

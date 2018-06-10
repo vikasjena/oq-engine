@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 #
-# Copyright (C) 2014-2017 GEM Foundation
+# Copyright (C) 2014-2018 GEM Foundation
 #
 # OpenQuake is free software: you can redistribute it and/or modify it
 # under the terms of the GNU Affero General Public License as published
@@ -15,23 +15,17 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with OpenQuake. If not, see <http://www.gnu.org/licenses/>.
-
-from __future__ import division
-import operator
 import warnings
-import logging
 import numpy
 import h5py
-import mock
 
-from openquake.baselib import hdf5, general
+from openquake.baselib import hdf5
 from openquake.baselib.python3compat import decode
-from openquake.hazardlib.geo.mesh import (
-    surface_to_mesh, point3d, RectangularMesh)
-from openquake.hazardlib.source.rupture import BaseRupture, EBRupture
+from openquake.hazardlib.source.rupture import BaseRupture
+from openquake.hazardlib.geo.mesh import surface_to_mesh, point3d
 from openquake.hazardlib.gsim.base import ContextMaker
 from openquake.hazardlib.imt import from_string
-from openquake.hazardlib import geo, calc, probability_map
+from openquake.hazardlib import calc, probability_map
 
 TWO16 = 2 ** 16
 MAX_INT = 2 ** 31 - 1  # this is used in the random number generator
@@ -45,13 +39,6 @@ U32 = numpy.uint32
 F32 = numpy.float32
 U64 = numpy.uint64
 F64 = numpy.float64
-
-EVENTS = -2
-NBYTES = -1
-event_dt = numpy.dtype([('eid', U64), ('grp_id', U16), ('ses', U32),
-                        ('sample', U32)])
-
-BaseRupture.init()  # initialize rupture codes
 
 # ############## utilities for the classical calculator ############### #
 
@@ -80,6 +67,7 @@ def convert_to_array(pmap, nsites, imtls):
                 curve['%s-%s' % (imt, iml)] = pcurve.array[idx]
                 idx += 1
     return curves
+
 
 # ######################### hazard maps ################################### #
 
@@ -278,7 +266,7 @@ def fix_minimum_intensity(min_iml, imts):
 
     >>> min_iml = {'PGA': 0.1, 'default': 0.05}
     >>> fix_minimum_intensity(min_iml, ['PGA', 'PGV'])
-    array([ 0.1 ,  0.05], dtype=float32)
+    array([0.1 , 0.05], dtype=float32)
     >>> sorted(min_iml.items())
     [('PGA', 0.1), ('PGV', 0.05)]
     """
@@ -339,8 +327,8 @@ class RuptureData(object):
         data = []
         for ebr in ebruptures:
             rup = ebr.rupture
-            rc = self.cmaker.make_rupture_context(rup)
-            ruptparams = tuple(getattr(rc, param) for param in self.params)
+            self.cmaker.add_rup_params(rup)
+            ruptparams = tuple(getattr(rup, param) for param in self.params)
             point = rup.surface.get_middle_point()
             multi_lons, multi_lats = rup.surface.get_surface_boundaries()
             bounds = ','.join('((%s))' % ','.join(
@@ -446,155 +434,14 @@ class RuptureSerializer(object):
         self.datastore.flush()
 
     def close(self):
-        pass
-
-
-def get_ruptures_by_grp(dstore, slice_=slice(None)):
-    """
-    Extracts the ruptures of the given grp_id
-    """
-    if slice_.stop is None:
-        n = len(dstore['ruptures']) - (slice_.start or 0)
-        logging.info('Reading %d ruptures from the datastore', n)
-    # disable check on PlaceSurface to support UCERF ruptures
-    with mock.patch(
-            'openquake.hazardlib.geo.surface.PlanarSurface.'
-            'IMPERFECT_RECTANGLE_TOLERANCE', numpy.inf):
-        rgetter = RuptureGetter(dstore, slice_)
-        return general.groupby(rgetter, operator.attrgetter('grp_id'))
-
-
-def get_maxloss_rupture(dstore, loss_type):
-    """
-    :param dstore: a DataStore instance
-    :param loss_type: a loss type string
-    :returns:
-        EBRupture instance corresponding to the maximum loss for the
-        given loss type
-    """
-    lti = dstore['oqparam'].lti[loss_type]
-    ridx = dstore.get_attr('rup_loss_table', 'ridx')[lti]
-    [ebr] = RuptureGetter(dstore, slice(ridx, ridx + 1))
-    return ebr
-
-
-class RuptureGetter(object):
-    """
-    Iterable over ruptures.
-
-    :param dstore:
-        a DataStore instance with a dataset names `ruptures`
-    :param mask:
-        which ruptures to read; it can be:
-        - None: read all ruptures
-        - a slice
-        - a boolean mask
-        - a list of integers
-    :param grp_id:
-        the group ID of the ruptures, if they are homogeneous, or None
-    """
-    @classmethod
-    def from_(cls, dstore):
         """
-        :returns: a dictionary grp_id -> RuptureGetter instance
+        Save information about the rupture codes as attributes of the
+        'ruptures' dataset.
         """
-        array = dstore['ruptures'].value
-        grp_ids = numpy.unique(array['grp_id'])
-        return {grp_id: cls(dstore, array['grp_id'] == grp_id, grp_id)
-                for grp_id in grp_ids}
-
-    def __init__(self, dstore, mask=None, grp_id=None):
-        self.dstore = dstore
-        self.mask = slice(None) if mask is None else mask
-        self.grp_id = grp_id
-
-    def split(self, block_size):
-        """
-        Split a RuptureGetter in multiple getters, each one containing a block
-        of ruptures.
-
-        :param block_size:
-            maximum length of the rupture blocks
-        :returns:
-            `RuptureGetters` containing `block_size` ruptures and with
-            an attribute `.n_events` counting the total number of events
-        """
-        getters = []
-        indices, = self.mask.nonzero()
-        for block in general.block_splitter(indices, block_size):
-            idxs = list(block)  # not numpy.int_(block)!
-            rgetter = self.__class__(self.dstore, idxs, self.grp_id)
-            rup = self.dstore['ruptures'][idxs]
-            # use int below, otherwise n_events would be a numpy.uint64
-            rgetter.n_events = int((rup['eidx2'] - rup['eidx1']).sum())
-            getters.append(rgetter)
-        return getters
-
-    def __iter__(self):
-        self.dstore.open()  # if needed
-        oq = self.dstore['oqparam']
-        grp_trt = self.dstore['csm_info'].grp_by("trt")
-        ruptures = self.dstore['ruptures'][self.mask]
-        # NB: ruptures.sort(order='serial') causes sometimes a SystemError:
-        # <ufunc 'greater'> returned a result with an error set
-        # this is way I am sorting with Python and not with numpy below
-        data = sorted((ser, idx) for idx, ser in enumerate(ruptures['serial']))
-        for serial, ridx in data:
-            rec = ruptures[ridx]
-            evs = self.dstore['events'][rec['eidx1']:rec['eidx2']]
-            if self.grp_id is not None and self.grp_id != rec['grp_id']:
-                continue
-            mesh = rec['points'].reshape(rec['sx'], rec['sy'], rec['sz'])
-            rupture_cls, surface_cls, source_cls = BaseRupture.types[
-                rec['code']]
-            rupture = object.__new__(rupture_cls)
-            rupture.surface = object.__new__(surface_cls)
-            # MISSING: case complex_fault_mesh_spacing != rupture_mesh_spacing
-            if 'Complex' in surface_cls.__name__:
-                mesh_spacing = oq.complex_fault_mesh_spacing
-            else:
-                mesh_spacing = oq.rupture_mesh_spacing
-            rupture.source_typology = source_cls
-            rupture.mag = rec['mag']
-            rupture.rake = rec['rake']
-            rupture.seed = rec['seed']
-            rupture.hypocenter = geo.Point(*rec['hypo'])
-            rupture.occurrence_rate = rec['occurrence_rate']
-            rupture.tectonic_region_type = grp_trt[rec['grp_id']]
-            pmfx = rec['pmfx']
-            # disable check on PlanarSurface to support UCERF ruptures
-            with mock.patch(
-                    'openquake.hazardlib.geo.surface.PlanarSurface.'
-                    'IMPERFECT_RECTANGLE_TOLERANCE', numpy.inf):
-                if pmfx != -1:
-                    rupture.pmf = self.dstore['pmfs'][pmfx]
-                if surface_cls is geo.PlanarSurface:
-                    rupture.surface = geo.PlanarSurface.from_array(
-                        mesh_spacing, rec['points'])
-                elif surface_cls.__name__.endswith('MultiSurface'):
-                    rupture.surface.__init__([
-                        geo.PlanarSurface.from_array(
-                            mesh_spacing, m1.flatten())
-                        for m1 in mesh])
-                else:  # fault surface, strike and dip will be computed
-                    rupture.surface.strike = rupture.surface.dip = None
-                    m = mesh[0]
-                    rupture.surface.mesh = RectangularMesh(
-                        m['lon'], m['lat'], m['depth'])
-            ebr = EBRupture(rupture, (), evs, serial)
-            ebr.eidx1 = rec['eidx1']
-            ebr.eidx2 = rec['eidx2']
-            # not implemented: rupture_slip_direction
-            yield ebr
-
-    def __len__(self):
-        if hasattr(self.mask, 'start'):  # is a slice
-            if self.mask.start is None and self.mask.stop is None:
-                return len(self.dstore['ruptures'])
-            else:
-                return self.mask.stop - self.mask.start
-        elif isinstance(self.mask, list):
-            # NB: h5py wants lists, not arrays of indices
-            return len(self.mask)
-        else:  # is a boolean mask
-            return self.mask.sum()
+        if 'ruptures' not in self.datastore:  # for UCERF
+            return
+        codes = numpy.unique(self.datastore['ruptures']['code'])
+        attr = {'code_%d' % code: ' '.join(
+            cls.__name__ for cls in BaseRupture.types[code])
+                for code in codes}
+        self.datastore.set_attrs('ruptures', **attr)

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 #
-# Copyright (C) 2014-2017 GEM Foundation
+# Copyright (C) 2014-2018 GEM Foundation
 #
 # OpenQuake is free software: you can redistribute it and/or modify it
 # under the terms of the GNU Affero General Public License as published
@@ -19,7 +19,7 @@
 import numpy
 
 from openquake.baselib.general import AccumDict
-from openquake.hazardlib.stats import compute_stats2
+from openquake.hazardlib import stats
 from openquake.calculators import base, classical_risk
 
 
@@ -67,9 +67,4 @@ class ClassicalDamageCalculator(classical_risk.ClassicalRiskCalculator):
         for r in result:
             for aid, fractions in result[r].items():
                 damages[aid, r] = tuple(fractions)
-        self.datastore['damages-rlzs'] = damages
-        weights = [rlz.weight for rlz in self.rlzs_assoc.realizations]
-        if len(weights) > 1:  # compute stats
-            snames, sfuncs = zip(*self.oqparam.risk_stats())
-            dmg_stats = compute_stats2(damages, sfuncs, weights)
-            self.datastore['damages-stats'] = dmg_stats
+        stats.set_rlzs_stats(self.datastore, 'damages', damages)

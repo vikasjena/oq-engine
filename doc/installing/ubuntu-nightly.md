@@ -1,6 +1,7 @@
 # Installing the OpenQuake Engine nightly builds on Ubuntu Linux
 
 The OpenQuake Engine **nightly builds** are available in the form of *deb* binary packages for the following Ubuntu releases:
+- **Ubuntu 18.04** LTS (Bionic)
 - **Ubuntu 16.04** LTS (Xenial)
 - **Ubuntu 14.04** LTS (Trusty) 
 
@@ -19,8 +20,8 @@ sudo apt-get update
 
 Then to install the OpenQuake Engine and its libraries first remove stable packages and then install nightly build packages
 ```bash
-sudo apt-get remove --purge python-oq-.*
-sudo apt-get install python-oq-engine
+sudo apt-get remove --purge python-oq-.* python3-oq-.*
+sudo apt-get install python3-oq-engine
 ```
 
 Now you can follow the [standard installing procedures](./ubuntu.md#configure-the-system-services)

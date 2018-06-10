@@ -3,8 +3,8 @@ Ucerf test
 
 ============== ===================
 checksum32     2,080,369,829      
-date           2018-02-02T16:02:35
-engine_version 2.9.0-gitd6a3184   
+date           2018-06-05T06:38:21
+engine_version 3.2.0-git65c4735   
 ============== ===================
 
 num_sites = 155, num_levels = 6
@@ -23,8 +23,10 @@ complex_fault_mesh_spacing      1.0
 width_of_mfd_bin                1.0               
 area_source_discretization      None              
 ground_motion_correlation_model None              
+minimum_intensity               {'default': 0.1}  
 random_seed                     1066              
 master_seed                     0                 
+ses_seed                        1066              
 =============================== ==================
 
 Input files
@@ -41,34 +43,34 @@ source_model_logic_tree `dummy_ucerf_smlt_redux.xml <dummy_ucerf_smlt_redux.xml>
 
 Composite source model
 ----------------------
-========= ====== =============== ================
-smlt_path weight gsim_logic_tree num_realizations
-========= ====== =============== ================
-ltbr0001  0.006  simple(2)       2/2             
-ltbr0002  0.006  simple(2)       2/2             
-ltbr0003  0.050  simple(2)       2/2             
-ltbr0037  0.006  simple(2)       2/2             
-ltbr0038  0.006  simple(2)       2/2             
-ltbr0039  0.050  simple(2)       2/2             
-ltbr0541  0.019  simple(2)       2/2             
-ltbr0542  0.019  simple(2)       2/2             
-ltbr0543  0.150  simple(2)       2/2             
-ltbr0577  0.019  simple(2)       2/2             
-ltbr0578  0.019  simple(2)       2/2             
-ltbr0579  0.150  simple(2)       2/2             
-ltbr0721  0.006  simple(2)       2/2             
-ltbr0722  0.006  simple(2)       2/2             
-ltbr0723  0.050  simple(2)       2/2             
-ltbr0757  0.006  simple(2)       2/2             
-ltbr0758  0.006  simple(2)       2/2             
-ltbr0759  0.050  simple(2)       2/2             
-ltbr1261  0.019  simple(2)       2/2             
-ltbr1262  0.019  simple(2)       2/2             
-ltbr1263  0.150  simple(2)       2/2             
-ltbr1297  0.019  simple(2)       2/2             
-ltbr1298  0.019  simple(2)       2/2             
-ltbr1299  0.150  simple(2)       2/2             
-========= ====== =============== ================
+========= ======= =============== ================
+smlt_path weight  gsim_logic_tree num_realizations
+========= ======= =============== ================
+ltbr0001  0.00625 simple(2)       2/2             
+ltbr0002  0.00625 simple(2)       2/2             
+ltbr0003  0.05000 simple(2)       2/2             
+ltbr0037  0.00625 simple(2)       2/2             
+ltbr0038  0.00625 simple(2)       2/2             
+ltbr0039  0.05000 simple(2)       2/2             
+ltbr0541  0.01875 simple(2)       2/2             
+ltbr0542  0.01875 simple(2)       2/2             
+ltbr0543  0.15000 simple(2)       2/2             
+ltbr0577  0.01875 simple(2)       2/2             
+ltbr0578  0.01875 simple(2)       2/2             
+ltbr0579  0.15000 simple(2)       2/2             
+ltbr0721  0.00625 simple(2)       2/2             
+ltbr0722  0.00625 simple(2)       2/2             
+ltbr0723  0.05000 simple(2)       2/2             
+ltbr0757  0.00625 simple(2)       2/2             
+ltbr0758  0.00625 simple(2)       2/2             
+ltbr0759  0.05000 simple(2)       2/2             
+ltbr1261  0.01875 simple(2)       2/2             
+ltbr1262  0.01875 simple(2)       2/2             
+ltbr1263  0.15000 simple(2)       2/2             
+ltbr1297  0.01875 simple(2)       2/2             
+ltbr1298  0.01875 simple(2)       2/2             
+ltbr1299  0.15000 simple(2)       2/2             
+========= ======= =============== ================
 
 Required parameters per tectonic region type
 --------------------------------------------
@@ -158,8 +160,8 @@ Realizations per (TRT, GSIM)
 
 Slowest operations
 ------------------
-======================= ========= ========= ======
-operation               time_sec  memory_mb counts
-======================= ========= ========= ======
-reading site collection 9.480E-04 0.0       1     
-======================= ========= ========= ======
+======================= ======== ========= ======
+operation               time_sec memory_mb counts
+======================= ======== ========= ======
+reading site collection 0.00168  0.0       1     
+======================= ======== ========= ======

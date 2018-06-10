@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 #
-# Copyright (C) 2014-2017 GEM Foundation
+# Copyright (C) 2014-2018 GEM Foundation
 #
 # OpenQuake is free software: you can redistribute it and/or modify it
 # under the terms of the GNU Affero General Public License as published
@@ -22,16 +22,16 @@ import shutil
 import logging
 import tempfile
 import unittest
-import platform
+import sys
 
 import numpy
 
 from openquake.calculators import base
-from openquake.baselib import performance, datastore
+from openquake.baselib import datastore, general
 from openquake.commonlib import readinput, oqvalidation
 
 
-REFERENCE_OS = 'Ubuntu-16.04' in platform.platform()
+NOT_DARWIN = sys.platform != 'darwin'
 
 
 class DifferentFiles(Exception):
@@ -66,6 +66,10 @@ class CalculatorTestCase(unittest.TestCase):
     OVERWRITE_EXPECTED = False
     edir = None  # will be set to a temporary directory
 
+    @classmethod
+    def setUpClass(cls):
+        cls.duration = general.AccumDict()
+
     def get_calc(self, testfile, job_ini, **kw):
         """
         Return the outputs of the calculation as a dictionary
@@ -73,16 +77,14 @@ class CalculatorTestCase(unittest.TestCase):
         self.testdir = os.path.dirname(testfile) if os.path.isfile(testfile) \
             else testfile
         inis = [os.path.join(self.testdir, ini) for ini in job_ini.split(',')]
-        params = readinput.get_params(inis)
-        params.update(kw)
+        params = readinput.get_params(inis, **kw)
 
         oqvalidation.OqParam.calculation_mode.validator.choices = tuple(
             base.calculators)
         oq = oqvalidation.OqParam(**params)
         oq.validate()
         # change this when debugging the test
-        monitor = performance.Monitor(self.testdir)
-        return base.calculators(oq, monitor)
+        return base.calculators(oq)
 
     def run_calc(self, testfile, job_ini, **kw):
         """
@@ -94,15 +96,21 @@ class CalculatorTestCase(unittest.TestCase):
         self.edir = tempfile.mkdtemp()
         with self.calc._monitor:
             result = self.calc.run(export_dir=self.edir)
+        duration = {inis[0]: self.calc._monitor.duration}
         if len(inis) == 2:
             hc_id = self.calc.datastore.calc_id
             self.calc = self.get_calc(
                 testfile, inis[1], hazard_calculation_id=str(hc_id), **kw)
+            # run the second job.ini with zero tasks to avoid fork issues
             with self.calc._monitor:
-                result.update(self.calc.run(export_dir=self.edir))
+                exported = self.calc.run(export_dir=self.edir,
+                                         concurrent_tasks=0)
+                result.update(exported)
+            duration[inis[1]] = self.calc._monitor.duration
         # reopen datastore, since some tests need to export from it
         dstore = datastore.read(self.calc.datastore.calc_id)
         self.calc.datastore = dstore
+        self.__class__.duration += duration
         return result
 
     def execute(self, testfile, job_ini):
@@ -134,6 +142,9 @@ class CalculatorTestCase(unittest.TestCase):
         """
         expected = os.path.abspath(os.path.join(self.testdir, fname1))
         if not os.path.exists(expected) and self.OVERWRITE_EXPECTED:
+            expected_dir = os.path.dirname(expected)
+            if not os.path.exists(expected_dir):
+                os.makedirs(expected_dir)
             open(expected, 'w').write('')
         actual = os.path.abspath(
             os.path.join(self.calc.oqparam.export_dir, fname2))
@@ -164,7 +175,7 @@ class CalculatorTestCase(unittest.TestCase):
             self.assertEqual(expected_content, actual.read())
 
     def run(self, result=None):
-        res = super(CalculatorTestCase, self).run(result)
+        res = super().run(result)
         if res is not None:  # for Python 3
             issues = len(res.errors) + len(res.failures)
         else:
@@ -173,3 +184,7 @@ class CalculatorTestCase(unittest.TestCase):
         if self.edir and not issues:
             shutil.rmtree(self.edir)
         return res
+
+    @classmethod
+    def tearDownClass(cls):
+        print('durations =', cls.duration)

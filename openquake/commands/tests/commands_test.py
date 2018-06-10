@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 #
-# Copyright (C) 2015-2017 GEM Foundation
+# Copyright (C) 2015-2018 GEM Foundation
 #
 # OpenQuake is free software: you can redistribute it and/or modify it
 # under the terms of the GNU Affero General Public License as published
@@ -15,7 +15,6 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with OpenQuake. If not, see <http://www.gnu.org/licenses/>.
-from __future__ import print_function
 import os
 import sys
 import mock
@@ -25,7 +24,8 @@ import tempfile
 import unittest
 
 from openquake.baselib.python3compat import encode
-from openquake.baselib.general import writetmp
+from openquake.baselib.general import gettemp
+from openquake.baselib.datastore import read
 from openquake import commonlib
 from openquake.commands.info import info
 from openquake.commands.tidy import tidy
@@ -40,6 +40,7 @@ from openquake.commands.from_shapefile import from_shapefile
 from openquake.commands.zip import zip as zip_cmd
 from openquake.commands import run
 from openquake.commands.upgrade_nrml import upgrade_nrml
+from openquake.calculators.views import view
 from openquake.qa_tests_data.classical import case_1, case_9, case_18
 from openquake.qa_tests_data.classical_risk import case_3
 from openquake.qa_tests_data.scenario import case_4
@@ -115,12 +116,17 @@ See http://docs.openquake.org/oq-engine/stable/effective-realizations.html for a
         # this is a test with multiple same ID sources
         self.assertIn('multiplicity', str(p))
 
-    # NB: info --report is tested in the packager
+    def test_report(self):
+        path = os.path.join(os.path.dirname(case_9.__file__), 'job.ini')
+        save = 'openquake.calculators.reportwriter.ReportWriter.save'
+        with Print.patch() as p, mock.patch(save, lambda self, fname: None):
+            info(None, None, None, None, None, True, path)
+        self.assertIn('report.rst', str(p))
 
 
 class TidyTestCase(unittest.TestCase):
     def test_ok(self):
-        fname = writetmp('''\
+        fname = gettemp('''\
 <?xml version="1.0" encoding="utf-8"?>
 <nrml xmlns="http://openquake.org/xmlns/nrml/0.4"
       xmlns:gml="http://www.opengis.net/gml">
@@ -162,7 +168,7 @@ xmlns:gml="http://www.opengis.net/gml"
 ''')
 
     def test_invalid(self):
-        fname = writetmp('''\
+        fname = gettemp('''\
 <?xml version="1.0" encoding="utf-8"?>
 <nrml xmlns="http://openquake.org/xmlns/nrml/0.4"
       xmlns:gml="http://www.opengis.net/gml">
@@ -211,12 +217,14 @@ class RunShowExportTestCase(unittest.TestCase):
         with Print.patch() as p:
             show('slow_sources', self.calc_id)
         self.assertIn('source_id source_class num_ruptures calc_time '
-                      'num_sites num_split', str(p))
+                      'split_time num_sites num_split', str(p))
 
     def test_show_attrs(self):
         with Print.patch() as p:
-            show_attrs('poes', self.calc_id)
-        self.assertEqual('nbytes 48', str(p))
+            show_attrs('sitecol', self.calc_id)
+        self.assertEqual(
+            '__pyclass__ openquake.hazardlib.site.SiteCollection\nnbytes 54',
+            str(p))
 
     def test_export_calc(self):
         tempdir = tempfile.mkdtemp()
@@ -365,6 +373,10 @@ class SourceModelShapefileConverterTestCase(unittest.TestCase):
                     for f in os.listdir(self.OUTDIR)]
         from_shapefile(os.path.join(self.OUTDIR, 'smc'), shpfiles, True)
 
+    def tearDown(self):
+        # comment out the line below if you need to debug the test
+        shutil.rmtree(self.OUTDIR)
+
 
 class DbTestCase(unittest.TestCase):
     def test_db(self):
@@ -387,5 +399,12 @@ class EngineRunJobTestCase(unittest.TestCase):
         job_ini = os.path.join(
             os.path.dirname(case_master.__file__), 'job.ini')
         with Print.patch() as p:
-            run_job(job_ini, log_level='error')
+            job_id = run_job(job_ini, log_level='error')
         self.assertIn('id | name', str(p))
+
+        # sanity check on the performance view: make sure that the most
+        # relevant information is stored (it can be lost for instance due
+        # to a wrong refactoring of the safely_call function)
+        with read(job_id) as dstore:
+            perf = view('performance', dstore)
+            self.assertIn('total event_based_risk', perf)

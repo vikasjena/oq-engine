@@ -1,10 +1,11 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 #
 # LICENSE
 #
-# Copyright (c) 2010-2017, GEM Foundation, G. Weatherill, M. Pagani,
+# Copyright (C) 2010-2018 GEM Foundation, G. Weatherill, M. Pagani,
 # D. Monelli.
 #
 # The Hazard Modeller's Toolkit is free software: you can redistribute
@@ -44,11 +45,9 @@
 #
 # The GEM Foundation, and the authors of the software, assume no
 # liability for use of the software.
-#!/usr/bin/env python
 '''
 Utility functions for seismicity calculations
 '''
-from __future__ import division
 import numpy as np
 from shapely import geometry
 try:

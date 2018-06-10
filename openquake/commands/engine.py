@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 #
-# Copyright (C) 2014-2017 GEM Foundation
+# Copyright (C) 2014-2018 GEM Foundation
 #
 # OpenQuake is free software: you can redistribute it and/or modify it
 # under the terms of the GNU Affero General Public License as published
@@ -15,7 +15,6 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with OpenQuake. If not, see <http://www.gnu.org/licenses/>.
-from __future__ import print_function
 import os
 import sys
 import getpass
@@ -63,9 +62,8 @@ def run_job(cfg_file, log_level='info', log_file=None, exports='',
     job_ini = os.path.abspath(cfg_file)
     job_id, oqparam = eng.job_from_file(
         job_ini, getpass.getuser(), hazard_calculation_id)
-    calc = eng.run_calc(job_id, oqparam, log_level, log_file, exports,
-                        hazard_calculation_id=hazard_calculation_id, **kw)
-    calc._monitor.flush()
+    eng.run_calc(job_id, oqparam, log_level, log_file, exports,
+                 hazard_calculation_id=hazard_calculation_id, **kw)
     for line in logs.dbcmd('list_outputs', job_id, False):
         safeprint(line)
     return job_id
@@ -91,17 +89,19 @@ def del_calculation(job_id, confirmed=False):
             'all associated outputs?\nThis action cannot be undone. (y/n): '):
         try:
             abort(job_id)
-            logs.dbcmd('del_calc', job_id, getpass.getuser())
+            resp = logs.dbcmd('del_calc', job_id, getpass.getuser())
         except RuntimeError as err:
             safeprint(err)
         else:
-            print('Removed %d' % job_id)
+            if 'success' in resp:
+                print('Removed %d' % job_id)
+            else:
+                print(resp['error'])
 
 
 @sap.Script
 def engine(log_file, no_distribute, yes, config_file, make_html_report,
-           upgrade_db, db_version, what_if_I_upgrade,
-           run_hazard, run_risk, run,
+           upgrade_db, db_version, what_if_I_upgrade, run,
            list_hazard_calculations, list_risk_calculations,
            delete_calculation, delete_uncompleted_calculations,
            hazard_calculation_id, list_outputs, show_log,
@@ -110,7 +110,7 @@ def engine(log_file, no_distribute, yes, config_file, make_html_report,
     """
     Run a calculation using the traditional command line API
     """
-    if run or run_hazard or run_risk:
+    if run:
         # the logging will be configured in engine.py
         pass
     else:
@@ -173,30 +173,12 @@ def engine(log_file, no_distribute, yes, config_file, make_html_report,
         for line in logs.dbcmd(
                 'list_calculations', 'hazard', getpass.getuser()):
             safeprint(line)
-    elif run_hazard is not None:
-        safeprint('WARN: --rh/--run-hazard are deprecated, use --run instead',
-                  file=sys.stderr)
-        log_file = os.path.expanduser(log_file) \
-            if log_file is not None else None
-        run_job(os.path.expanduser(run_hazard), log_level,
-                log_file, exports)
     elif delete_calculation is not None:
         del_calculation(delete_calculation, yes)
     # risk
     elif list_risk_calculations:
         for line in logs.dbcmd('list_calculations', 'risk', getpass.getuser()):
             safeprint(line)
-    elif run_risk is not None:
-        safeprint('WARN: --rr/--run-risk are deprecated, use --run instead',
-                  file=sys.stderr)
-        if hazard_calculation_id is None:
-            sys.exit(MISSING_HAZARD_MSG)
-        log_file = os.path.expanduser(log_file) \
-            if log_file is not None else None
-        run_job(
-            os.path.expanduser(run_risk),
-            log_level, log_file, exports,
-            hazard_calculation_id=hc_id)
 
     # export
     elif make_html_report:
@@ -252,10 +234,6 @@ engine.flg('upgrade_db', 'Upgrade the openquake database')
 engine.flg('db_version', 'Show the current version of the openquake database')
 engine.flg('what_if_I_upgrade', 'Show what will happen to the openquake '
            'database if you upgrade')
-engine._add('run_hazard', '--run-hazard', '--rh', help='Run a hazard job with '
-            'the specified config file', metavar='CONFIG_FILE')
-engine._add('run_risk', '--run-risk', '--rr', help='Run a risk job with the '
-            'specified config file', metavar='CONFIG_FILE')
 engine._add('run', '--run', help='Run a job with the specified config file',
             metavar='CONFIG_FILE')
 engine._add('list_hazard_calculations', '--list-hazard-calculations', '--lhc',

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 #
-# Copyright (C) 2015-2017 GEM Foundation
+# Copyright (C) 2015-2018 GEM Foundation
 #
 # OpenQuake is free software: you can redistribute it and/or modify it
 # under the terms of the GNU Affero General Public License as published
@@ -20,7 +20,6 @@
 Here there are some real functional tests starting an engine server and
 running computations.
 """
-from __future__ import print_function
 import io
 import os
 import re
@@ -34,7 +33,7 @@ import tempfile
 import string
 import random
 from django.test import Client
-from openquake.baselib.general import writetmp
+from openquake.baselib.general import gettemp
 from openquake.engine.export import core
 from openquake.server.db import actions
 from openquake.server.dbserver import db, get_status
@@ -57,11 +56,11 @@ class EngineServerTestCase(unittest.TestCase):
     def get(cls, path, **data):
         resp = cls.c.get('/v1/calc/%s' % path, data,
                          HTTP_HOST='127.0.0.1')
-        assert resp.content
+        assert resp.content, 'No content from /v1/calc/%s' % path
         try:
             return json.loads(resp.content.decode('utf8'))
-        except:
-            print('Invalid JSON, see %s' % writetmp(resp.content),
+        except Exception:
+            print('Invalid JSON, see %s' % gettemp(resp.content),
                   file=sys.stderr)
             return {}
 
@@ -86,7 +85,7 @@ class EngineServerTestCase(unittest.TestCase):
             resp = self.post('run', dict(archive=a))
         try:
             js = json.loads(resp.content.decode('utf8'))
-        except:
+        except Exception:
             raise ValueError(b'Invalid JSON response: %r' % resp.content)
         if resp.status_code == 200:  # ok case
             job_id = js['job_id']
@@ -156,12 +155,27 @@ class EngineServerTestCase(unittest.TestCase):
         self.assertEqual(len(got['array']), 0)  # there are 0 assets on site 0
         self.assertEqual(resp.status_code, 200)
 
+        # check asset_tags
+        resp = self.c.get(extract_url + 'asset_tags')
+        data = b''.join(ln for ln in resp.streaming_content)
+        got = numpy.load(io.BytesIO(data))  # load npz file
+        self.assertEqual(len(got['taxonomy']), 7)
+
         # check avg_losses-rlzs
         resp = self.c.get(
             extract_url + 'agglosses/structural?taxonomy=W-SLFB-1')
         data = b''.join(ln for ln in resp.streaming_content)
         got = numpy.load(io.BytesIO(data))  # load npz file
         self.assertEqual(len(got['array']), 1)  # expected 1 aggregate value
+        self.assertEqual(resp.status_code, 200)
+
+        # check *-aggregation
+        resp = self.c.get(
+            extract_url + 'agglosses/structural?taxonomy=*')
+        data = b''.join(ln for ln in resp.streaming_content)
+        got = numpy.load(io.BytesIO(data))  # load npz file
+        self.assertEqual(len(got['tags']), 6)  # expected 6 taxonomies
+        self.assertEqual(len(got['array']), 6)  # expected 6 aggregates
         self.assertEqual(resp.status_code, 200)
 
         # TODO: check aggcurves
@@ -178,10 +192,11 @@ class EngineServerTestCase(unittest.TestCase):
         job_id = self.postzip('classical.zip')
         self.wait()
 
-        # check that we get the expected 5 outputs
+        # check that we get at least the following 5 outputs
         # fullreport, hcurves, hmaps, realizations, sourcegroups
+        # we can add more outputs in the future
         results = self.get('%s/results' % job_id)
-        self.assertEqual(len(results), 5)
+        self.assertGreaterEqual(len(results), 5)
 
         # check the filename of the hmaps
         hmaps_id = results[2]['id']

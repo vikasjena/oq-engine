@@ -1,5 +1,5 @@
 # The Hazard Library
-# Copyright (C) 2012-2017 GEM Foundation
+# Copyright (C) 2012-2018 GEM Foundation
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -15,7 +15,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import unittest
 import os.path
-
 import numpy
 
 from openquake.hazardlib.calc import disagg
@@ -52,7 +51,7 @@ class DisaggregateTestCase(unittest.TestCase):
     def setUp(self):
         d = os.path.dirname(os.path.dirname(__file__))
         source_model = os.path.join(d, 'source_model/multi-point-source.xml')
-        [self.sources] = nrml.parse(source_model, SourceConverter(
+        [self.sources] = nrml.to_python(source_model, SourceConverter(
             investigation_time=50., rupture_mesh_spacing=2.))
         self.site = Site(Point(0.1, 0.1), 800, True, z1pt0=100., z2pt5=1.)
         self.imt = PGA()
@@ -84,7 +83,7 @@ class DisaggregateTestCase(unittest.TestCase):
 
 class PMFExtractorsTestCase(unittest.TestCase):
     def setUp(self):
-        super(PMFExtractorsTestCase, self).setUp()
+        super().setUp()
         self.aae = numpy.testing.assert_almost_equal
 
         # test matrix is not normalized, but that's fine for test
@@ -146,8 +145,10 @@ class PMFExtractorsTestCase(unittest.TestCase):
         self.aae(pmf, [1.0, 1.0])
 
     def test_trt(self):
-        pmf = disagg.trt_pmf(self.matrix)
-        self.aae(pmf, [1.0, 1.0, 1.0])
+        pmf = disagg.trt_pmf(self.matrix[None])
+        # NB: self.matrix.shape -> (2, 2, 2, 2, 3)
+        # self.matrix[None].shape -> (1, 2, 2, 2, 2, 3)
+        self.aae(pmf, [1.0])
 
     def test_mag_dist(self):
         pmf = disagg.mag_dist_pmf(self.matrix)
@@ -171,3 +172,16 @@ class PMFExtractorsTestCase(unittest.TestCase):
                         [0.9993916, 0.98589012]],
                        [[0.99232001, 0.99965328],
                         [0.99700079, 0.99480979]]])
+
+    def test_mean(self):
+        # for doc purposes: the mean of PMFs is not the PMF of the mean
+        numpy.random.seed(42)
+        matrix = numpy.random.random(self.matrix.shape)
+        pmf1 = disagg.mag_pmf(self.matrix)
+        pmf2 = disagg.mag_pmf(matrix)
+        mean = (matrix + self.matrix) / 2
+        numpy.testing.assert_allclose(
+            (pmf1 + pmf2) / 2, [1, 1])
+        numpy.testing.assert_allclose(
+            disagg.mag_pmf(mean), [0.99999944, 0.99999999])
+

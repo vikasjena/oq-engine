@@ -1,5 +1,5 @@
 # The Hazard Library
-# Copyright (C) 2012-2017 GEM Foundation
+# Copyright (C) 2012-2018 GEM Foundation
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -18,12 +18,12 @@ import pickle
 import numpy
 
 import openquake.hazardlib
+from openquake.baselib.parallel import Starmap, sequential_apply
 from openquake.hazardlib import const
 from openquake.hazardlib.geo.point import Point
 from openquake.hazardlib.tom import PoissonTOM
 from openquake.hazardlib.calc.hazard_curve import calc_hazard_curves
 from openquake.hazardlib.calc.filters import SourceFilter, IntegrationDistance
-from openquake.baselib.parallel import Sequential, Processmap
 from openquake.hazardlib.site import Site, SiteCollection
 from openquake.hazardlib.gsim import akkar_bommer_2010
 from openquake.hazardlib.pmf import PMF
@@ -162,13 +162,14 @@ def example_calc(apply):
     imtls = {'PGA': [0.01, 0.1, 0.2, 0.5, 0.8],
              'SA(0.5)': [0.01, 0.1, 0.2, 0.5, 0.8]}
     gsims = {'Active Shallow Crust': akkar_bommer_2010.AkkarBommer2010()}
-    return calc_hazard_curves(sources, sitecol, imtls, gsims, apply=apply)
+    return calc_hazard_curves(sources, sitecol, imtls, gsims, apply=apply,
+                              filter_distance='rrup')
 
 
 class HazardCurvesParallelTestCase(unittest.TestCase):
     def test_same_curves_as_sequential(self):
-        curves_par = example_calc(Processmap.apply)  # use multiprocessing
-        curves_seq = example_calc(Sequential.apply)  # sequential computation
+        curves_par = example_calc(Starmap.apply)  # use multiprocessing
+        curves_seq = example_calc(sequential_apply)  # sequential computation
         for name in curves_par.dtype.names:
             numpy.testing.assert_almost_equal(
                 curves_seq[name], curves_par[name])

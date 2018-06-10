@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 #
-# Copyright (C) 2015-2017 GEM Foundation
+# Copyright (C) 2015-2018 GEM Foundation
 #
 # OpenQuake is free software: you can redistribute it and/or modify it
 # under the terms of the GNU Affero General Public License as published
@@ -15,20 +15,19 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with OpenQuake. If not, see <http://www.gnu.org/licenses/>.
-
 import numpy
 from nose.plugins.attrib import attr
 from openquake.baselib import parallel
-from openquake.baselib.python3compat import decode
 from openquake.hazardlib import InvalidFile
+from openquake.calculators.views import view
 from openquake.calculators.export import export
 from openquake.calculators.extract import extract
-from openquake.calculators.tests import CalculatorTestCase, REFERENCE_OS
+from openquake.calculators.tests import CalculatorTestCase, NOT_DARWIN
 from openquake.qa_tests_data.classical import (
     case_1, case_2, case_3, case_4, case_5, case_6, case_7, case_8, case_9,
     case_10, case_11, case_12, case_13, case_14, case_15, case_16, case_17,
     case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25,
-    case_26, case_27, case_28)
+    case_26, case_27, case_28, case_29, case_30)
 
 
 class ClassicalTestCase(CalculatorTestCase):
@@ -53,11 +52,10 @@ class ClassicalTestCase(CalculatorTestCase):
             case_1.__file__)
 
         if parallel.oq_distribute() != 'no':
-            # make sure we saved the data transfer information in job_info
-            keys = {decode(key) for key in dict(
-                self.calc.datastore['job_info'])}
-            self.assertIn('classical.received', keys)
-            self.assertIn('classical.sent', keys)
+            info = view('job_info', self.calc.datastore)
+            self.assertIn('task', info)
+            self.assertIn('sent', info)
+            self.assertIn('received', info)
 
         # there is a single source
         self.assertEqual(len(self.calc.datastore['source_info']), 1)
@@ -68,6 +66,11 @@ class ClassicalTestCase(CalculatorTestCase):
         # check extraction
         sitecol = extract(self.calc.datastore, 'sitecol')
         self.assertEqual(repr(sitecol), '<SiteCollection with 1/1 sites>')
+
+        # check minimum_magnitude discards the source
+        with self.assertRaises(RuntimeError) as ctx:
+            self.run_calc(case_1.__file__, 'job.ini', minimum_magnitude='4.5')
+        self.assertEqual(str(ctx.exception), 'All sources were filtered away!')
 
     @attr('qa', 'hazard', 'classical')
     def test_wrong_smlt(self):
@@ -126,7 +129,7 @@ class ClassicalTestCase(CalculatorTestCase):
         # exercise the warning for no output when mean_hazard_curves='false'
         self.run_calc(
             case_7.__file__, 'job.ini', mean_hazard_curves='false',
-            hazard_maps='true', poes='0.1')
+            poes='0.1')
 
     @attr('qa', 'hazard', 'classical')
     def test_case_8(self):
@@ -178,7 +181,8 @@ class ClassicalTestCase(CalculatorTestCase):
         self.run_calc(
             case_13.__file__, 'job.ini', exports='csv', poes='0.2',
             hazard_calculation_id=str(self.calc.datastore.calc_id),
-            concurrent_tasks='0')
+            concurrent_tasks='0', gsim_logic_tree_file='',
+            source_model_logic_tree_file='')
         [fname] = export(('hmaps', 'csv'), self.calc.datastore)
         self.assertEqualFiles('expected/hazard_map-mean2.csv', fname,
                               delta=1E-5)
@@ -201,7 +205,7 @@ class ClassicalTestCase(CalculatorTestCase):
                                  'hmaps/poe-0.2/rlz-003'])
 
         # test extract/hcurves/rlz-0 also works, used by the npz exports
-        haz = dict(extract(self.calc.datastore, 'hcurves/rlz-0'))
+        haz = dict(extract(self.calc.datastore, 'hcurves'))
         self.assertEqual(sorted(haz), ['all', 'investigation_time'])
         self.assertEqual(
             haz['all'].dtype.names, ('lon', 'lat', 'depth', 'mean'))
@@ -315,10 +319,16 @@ hazard_uhs-mean.csv
 
         # check exporting a single realization in XML and CSV
         [fname] = export(('uhs/rlz-1', 'xml'),  self.calc.datastore)
-        if REFERENCE_OS:  # broken on macOS
+        if NOT_DARWIN:  # broken on macOS
             self.assertEqualFiles('expected/uhs-rlz-1.xml', fname)
         [fname] = export(('uhs/rlz-1', 'csv'),  self.calc.datastore)
         self.assertEqualFiles('expected/uhs-rlz-1.csv', fname)
+
+        # extracting hmaps
+        hmaps = dict(extract(self.calc.datastore, 'hmaps'))['all']['mean']
+        self.assertEqual(
+            hmaps.dtype.names,
+            ('PGA-0.002105', 'SA(0.2)-0.002105', 'SA(1.0)-0.002105'))
 
     @attr('qa', 'hazard', 'classical')
     def test_case_19(self):
@@ -388,7 +398,7 @@ hazard_uhs-mean.csv
             'hazard_curve-mean-SA(1.0).csv', 'hazard_curve-mean-SA(2.0).csv',
         ], case_22.__file__)
         checksum = self.calc.datastore['/'].attrs['checksum32']
-        self.assertEqual(checksum, 4227047805)
+        self.assertEqual(checksum, 1554747528)
 
     @attr('qa', 'hazard', 'classical')
     def test_case_23(self):  # filtering away on TRT
@@ -424,3 +434,14 @@ hazard_uhs-mean.csv
             'hazard_curve-mean-SA(0.1).csv', 'hazard_curve-mean-SA(0.2).csv',
             'hazard_curve-mean-SA(0.5)', 'hazard_curve-mean-SA(1.0).csv',
             'hazard_curve-mean-SA(2.0).csv'], case_28.__file__)
+
+    @attr('qa', 'hazard', 'classical')
+    def test_case_29(self):  # non parametric source
+        # check the high IMLs are zeros: this is a test for
+        # NonParametricProbabilisticRupture.get_probability_no_exceedance
+        self.assert_curves_ok(['hazard_curve-PGA.csv'], case_29.__file__)
+
+    @attr('qa', 'hazard', 'classical')
+    def test_case_30(self):  # point on the international data line
+        if NOT_DARWIN:  # broken on macOS
+            self.assert_curves_ok(['hazard_curve-PGA.csv'], case_30.__file__)

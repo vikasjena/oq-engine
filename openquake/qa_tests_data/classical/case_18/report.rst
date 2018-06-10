@@ -3,8 +3,8 @@ Demo Classical PSHA for Vancouver Schools
 
 ============== ===================
 checksum32     1,369,868,782      
-date           2018-02-02T16:03:34
-engine_version 2.9.0-gitd6a3184   
+date           2018-06-05T06:39:13
+engine_version 3.2.0-git65c4735   
 ============== ===================
 
 num_sites = 3, num_levels = 36
@@ -23,8 +23,10 @@ complex_fault_mesh_spacing      5.0
 width_of_mfd_bin                0.1               
 area_source_discretization      50.0              
 ground_motion_correlation_model None              
+minimum_intensity               {}                
 random_seed                     23                
 master_seed                     0                 
+ses_seed                        42                
 =============================== ==================
 
 Input files
@@ -41,19 +43,19 @@ source_model_logic_tree `source_model_logic_tree.xml <source_model_logic_tree.xm
 
 Composite source model
 ----------------------
-========= ====== =============== ================
-smlt_path weight gsim_logic_tree num_realizations
-========= ====== =============== ================
-b1        1.000  simple(3)       3/3             
-========= ====== =============== ================
+========= ======= =============== ================
+smlt_path weight  gsim_logic_tree num_realizations
+========= ======= =============== ================
+b1        1.00000 simple(3)       3/3             
+========= ======= =============== ================
 
 Required parameters per tectonic region type
 --------------------------------------------
-====== ========================================================================================================================================== ========= ========== ==========
-grp_id gsims                                                                                                                                      distances siteparams ruptparams
-====== ========================================================================================================================================== ========= ========== ==========
-0      GMPETable(gmpe_table='Wcrust_high_rhypo.hdf5') GMPETable(gmpe_table='Wcrust_low_rhypo.hdf5') GMPETable(gmpe_table='Wcrust_med_rhypo.hdf5') rhypo                mag       
-====== ========================================================================================================================================== ========= ========== ==========
+====== ========================================================================================================================================== ========== ========== ==========
+grp_id gsims                                                                                                                                      distances  siteparams ruptparams
+====== ========================================================================================================================================== ========== ========== ==========
+0      GMPETable(gmpe_table='Wcrust_high_rhypo.hdf5') GMPETable(gmpe_table='Wcrust_low_rhypo.hdf5') GMPETable(gmpe_table='Wcrust_med_rhypo.hdf5') rhypo rrup            mag       
+====== ========================================================================================================================================== ========== ========== ==========
 
 Realizations per (TRT, GSIM)
 ----------------------------
@@ -73,36 +75,20 @@ source_model              grp_id trt                  eff_ruptures tot_ruptures
 vancouver_area_source.xml 0      Active Shallow Crust 2,430        2,430       
 ========================= ====== ==================== ============ ============
 
-Informational data
-------------------
-======================= ====================================================================================
-count_ruptures.received tot 9.19 KB, max_per_task 629 B                                                     
-count_ruptures.sent     gsims 2.29 MB, sources 23.67 KB, srcfilter 12.16 KB, param 12.11 KB, monitor 4.67 KB
-hazard.input_weight     243.0                                                                               
-hazard.n_imts           3                                                                                   
-hazard.n_levels         36                                                                                  
-hazard.n_realizations   3                                                                                   
-hazard.n_sites          3                                                                                   
-hazard.n_sources        1                                                                                   
-hazard.output_weight    108.0                                                                               
-hostname                tstation.gem.lan                                                                    
-require_epsilons        False                                                                               
-======================= ====================================================================================
-
 Slowest sources
 ---------------
-========= ============ ============ ========= ========= =========
-source_id source_class num_ruptures calc_time num_sites num_split
-========= ============ ============ ========= ========= =========
-VICM      AreaSource   2,430        0.006     72        30       
-========= ============ ============ ========= ========= =========
+========= ============ ============ ========= ========== ========= ========= ======
+source_id source_class num_ruptures calc_time split_time num_sites num_split events
+========= ============ ============ ========= ========== ========= ========= ======
+VICM      AreaSource   2,430        0.05229   0.01070    3.00000   30        0     
+========= ============ ============ ========= ========== ========= ========= ======
 
 Computation times by source typology
 ------------------------------------
 ============ ========= ======
 source_class calc_time counts
 ============ ========= ======
-AreaSource   0.006     1     
+AreaSource   0.05229   1     
 ============ ========= ======
 
 Duplicated sources
@@ -111,21 +97,57 @@ There are no duplicated sources
 
 Information about the tasks
 ---------------------------
-================== ===== ========= ========= ===== =========
-operation-duration mean  stddev    min       max   num_tasks
-count_ruptures     0.001 2.476E-04 8.559E-04 0.002 15       
-================== ===== ========= ========= ===== =========
+================== ======= ========= ======= ======= =========
+operation-duration mean    stddev    min     max     num_tasks
+RtreeFilter        0.00361 0.00212   0.00113 0.01096 30       
+count_eff_ruptures 0.00967 8.317E-04 0.00838 0.01051 8        
+================== ======= ========= ======= ======= =========
+
+Fastest task
+------------
+taskno=6, weight=168, duration=0 s, sources="VICM"
+
+======== ======= ====== === === =
+variable mean    stddev min max n
+======== ======= ====== === === =
+nsites   3.00000 0.0    3   3   4
+weight   42      0.0    42  42  4
+======== ======= ====== === === =
+
+Slowest task
+------------
+taskno=2, weight=168, duration=0 s, sources="VICM"
+
+======== ======= ====== === === =
+variable mean    stddev min max n
+======== ======= ====== === === =
+nsites   3.00000 0.0    3   3   4
+weight   42      0.0    42  42  4
+======== ======= ====== === === =
+
+Data transfer
+-------------
+================== ============================================================================== ========
+task               sent                                                                           received
+RtreeFilter        srcs=39.54 KB monitor=10.14 KB srcfilter=8.17 KB                               42.09 KB
+count_eff_ruptures gsims=1.23 MB sources=23.51 KB param=6.56 KB monitor=2.76 KB srcfilter=1.82 KB 2.83 KB 
+================== ============================================================================== ========
 
 Slowest operations
 ------------------
 ============================== ========= ========= ======
 operation                      time_sec  memory_mb counts
 ============================== ========= ========= ======
-managing sources               0.031     0.0       1     
-reading composite source model 0.029     0.0       1     
-total count_ruptures           0.020     0.199     15    
-store source_info              0.006     0.0       1     
-aggregate curves               2.890E-04 0.0       15    
-reading site collection        1.965E-04 0.0       1     
-saving probability maps        4.363E-05 0.0       1     
+PSHACalculator.run             0.47386   0.19141   1     
+managing sources               0.22836   0.0       1     
+total prefilter                0.10832   3.46875   30    
+total count_eff_ruptures       0.07738   5.65234   8     
+reading composite source model 0.02884   0.0       1     
+splitting sources              0.01107   0.0       1     
+unpickling prefilter           0.00981   0.0       30    
+store source_info              0.00608   0.0       1     
+aggregate curves               0.00233   0.0       8     
+unpickling count_eff_ruptures  0.00182   0.0       8     
+reading site collection        0.00100   0.0       1     
+saving probability maps        1.972E-04 0.0       1     
 ============================== ========= ========= ======
