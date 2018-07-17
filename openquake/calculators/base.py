@@ -789,6 +789,7 @@ class RiskCalculator(HazardCalculator):
                     for riskinput in self.riskinputs]
         task_info = 'task_info/' + self.core_task.__func__.__name__
         hdf5.create(self.datastore.hdf5, task_info, task_data_dt)
+        self.datastore.hdf5.swmr_mode = True
         res = Starmap(self.core_task.__func__, all_args).reduce(self.combine)
         return res
 

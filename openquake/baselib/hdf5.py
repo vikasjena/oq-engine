@@ -86,8 +86,8 @@ def extend(dset, array, **attrs):
         shape = (newlength,) + array.shape[1:]
     dset.resize(shape)
     dset[length:newlength] = array
-    for key, val in attrs.items():
-        dset.attrs[key] = val
+    #for key, val in attrs.items():
+    #    dset.attrs[key] = val
     return newlength
 
 
@@ -357,6 +357,7 @@ class File(h5py.File):
         """
         Set the `nbytes` attribute on the HDF5 object identified by `key`.
         """
+        return 0
         obj = super().__getitem__(key)
         if nbytes is not None:  # size set from outside
             obj.attrs['nbytes'] = nbytes
