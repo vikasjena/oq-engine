@@ -109,6 +109,11 @@ class ScenarioRiskCalculator(base.RiskCalculator):
         self.param['number_of_ground_motion_fields'] = E
         self.param['insured_losses'] = self.oqparam.insured_losses
         self.param['asset_loss_table'] = self.oqparam.asset_loss_table
+        LI = len(oq.loss_dt().names)
+        self.datastore.create_dset('losses_by_asset', stat_dt,
+                                   (A, self.R, LI), fillvalue=None)
+        self.datastore.create_dset('agglosses-rlzs', stat_dt, (self.R, LI),
+                                   fillvalue=None)
 
     def post_execute(self, result):
         """
@@ -127,17 +132,14 @@ class ScenarioRiskCalculator(base.RiskCalculator):
             E, R, LI = res.shape
             L = LI // I
             mean, std = scientific.mean_std(res)  # shape (R, LI)
-            agglosses = numpy.zeros((R, LI), stat_dt)
-            agglosses['mean'] = F32(mean)
-            agglosses['stddev'] = F32(std)
+            self.datastore['agglosses-rlzs']['mean'] = F32(mean)
+            self.datastore['agglosses-rlzs']['stddev'] = F32(std)
 
             # losses by asset
-            losses_by_asset = numpy.zeros((A, R, LI), stat_dt)
+            losses_by_asset = self.datastore['losses_by_asset']
             for (l, r, aid, stat) in result['avg']:
                 for i in range(I):
                     losses_by_asset[aid, r, l + L * i] = stat[i]
-            self.datastore['losses_by_asset'] = losses_by_asset
-            self.datastore['agglosses-rlzs'] = agglosses
 
             # losses by event
             lbe = numpy.fromiter(

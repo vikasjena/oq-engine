@@ -394,7 +394,7 @@ class IterResult(object):
                  progress=logging.info, hdf5=None):
         self.iresults = iresults
         self.name = taskname
-        self.argnames = ' '.join(argnames)
+        self.argnames = argnames
         self.num_tasks = num_tasks
         self.sent = sent
         self.progress = progress
@@ -587,10 +587,11 @@ class Starmap(object):
         self.name = name or task_func.__name__
         self.task_args = task_args
         self.distribute = distribute or oq_distribute(task_func)
-        self.argnames = get_argnames(task_func)
+        argnames = get_argnames(task_func)
+        self.argnames = b' '.join(a.encode('utf8') for a in argnames)
         self.receiver = 'tcp://%s:%s' % (
             config.dbserver.listen, config.dbserver.receiver_ports)
-        self.sent = numpy.zeros(len(self.argnames))
+        self.sent = numpy.zeros(len(argnames))
 
     @property
     def num_tasks(self):
@@ -616,7 +617,8 @@ class Starmap(object):
             if mon.hdf5 and task_no == 1:
                 self.hdf5 = mon.hdf5
                 if task_info not in self.hdf5:  # first time
-                    hdf5.create(mon.hdf5, task_info, task_data_dt)
+                    hdf5.create(mon.hdf5, task_info, task_data_dt,
+                                attrs=dict(argnames=self.argnames))
             # add incremental task number and task weight
             mon.task_no = task_no
             mon.weight = getattr(args[0], 'weight', 1.)
@@ -642,6 +644,8 @@ class Starmap(object):
         elif self.distribute == 'dask':
             it = self._iter_dask()
         num_tasks = next(it)
+        if self.hdf5:
+            self.hdf5['task_info/' + self.name].attrs['sent'] = self.sent
         return IterResult(it, self.name, self.argnames, num_tasks,
                           self.sent, progress, self.hdf5)
 
