@@ -78,6 +78,7 @@ def extend(dset, array, **attrs):
     :param array: an array of length L
     :returns: the total length of the dataset (i.e. initial length + L)
     """
+    dset.refresh()
     length = len(dset)
     newlength = length + len(array)
     if array.dtype.name == 'object':  # vlen array
@@ -86,8 +87,8 @@ def extend(dset, array, **attrs):
         shape = (newlength,) + array.shape[1:]
     dset.resize(shape)
     dset[length:newlength] = array
-    #for key, val in attrs.items():
-    #    dset.attrs[key] = val
+    for key, val in attrs.items():
+        dset.attrs[key] = val
     return newlength
 
 
@@ -359,6 +360,8 @@ class File(h5py.File):
         """
         return 0
         obj = super().__getitem__(key)
+        if hasattr(obj, 'refresh'):  # a dataset
+            obj.refresh()
         if nbytes is not None:  # size set from outside
             obj.attrs['nbytes'] = nbytes
         else:  # recursively determine the size of the datagroup

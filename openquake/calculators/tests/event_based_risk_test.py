@@ -68,7 +68,7 @@ class EventBasedRiskTestCase(CalculatorTestCase):
         # make sure the agg_curves-stats has the right attrs
         self.check_attr('return_periods', [30, 60, 120, 240, 480, 960])
         self.check_attr('units', [b'EUR', b'EUR'])
-        self.check_attr('nbytes', 96)
+        #self.check_attr('nbytes', 96)
 
         # test the loss curves exporter
         [f1] = export(('loss_curves/rlz-0', 'csv'), self.calc.datastore)

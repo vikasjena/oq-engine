@@ -453,8 +453,8 @@ class IterResult(object):
             duration = mon.children[0].duration  # the task is the first child
             tup = (mon.task_no, mon.weight, duration, self.received[-1])
             data = numpy.array([tup], task_data_dt)
-            hdf5.extend(self.hdf5['task_info/' + self.name], data,
-                        argnames=self.argnames, sent=self.sent)
+            hdf5.extend(self.hdf5['task_info/' + self.name], data)
+            #argnames=self.argnames, sent=self.sent)
         mon.flush()
 
     def reduce(self, agg=operator.add, acc=None):
@@ -505,6 +505,16 @@ def _wakeup(sec, mon):
     """Waiting function, used to wake up the process pool"""
     time.sleep(sec)
     return os.getpid()
+
+
+def get_argnames(task_func):
+    # a task can be a function, a class or an instance with a __call__
+    if inspect.isfunction(task_func):
+        return inspect.getargspec(task_func).args
+    elif inspect.isclass(task_func):
+        return inspect.getargspec(task_func.__init__).args[1:]
+    else:  # instance with a __call__ method
+        return inspect.getargspec(task_func.__call__).args[1:]
 
 
 class Starmap(object):
@@ -574,13 +584,7 @@ class Starmap(object):
         else:
             self.progress = logging.info
         self.distribute = distribute or oq_distribute(task_func)
-        # a task can be a function, a class or an instance with a __call__
-        if inspect.isfunction(task_func):
-            self.argnames = inspect.getargspec(task_func).args
-        elif inspect.isclass(task_func):
-            self.argnames = inspect.getargspec(task_func.__init__).args[1:]
-        else:  # instance with a __call__ method
-            self.argnames = inspect.getargspec(task_func.__call__).args[1:]
+        self.argnames = get_argnames(task_func)
         self.receiver = 'tcp://%s:%s' % (
             config.dbserver.listen, config.dbserver.receiver_ports)
         self.sent = numpy.zeros(len(self.argnames))
