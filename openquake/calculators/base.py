@@ -35,7 +35,7 @@ from openquake.baselib.performance import perf_dt, Monitor
 from openquake.hazardlib.calc.filters import SourceFilter, RtreeFilter, rtree
 from openquake.risklib import riskinput, riskmodels
 from openquake.commonlib import readinput, source, calc, writers
-from openquake.baselib.parallel import Starmap
+from openquake.baselib.parallel import Starmap, task_data_dt
 from openquake.hazardlib.shakemap import get_sitecol_shakemap, to_gmfs
 from openquake.calculators.export import export as exp
 from openquake.calculators.getters import GmfDataGetter, PmapGetter
@@ -787,6 +787,8 @@ class RiskCalculator(HazardCalculator):
         mon = self.monitor('risk')
         all_args = [(riskinput, self.riskmodel, self.param, mon)
                     for riskinput in self.riskinputs]
+        task_info = 'task_info/' + self.core_task.__func__.__name__
+        hdf5.create(self.datastore.hdf5, task_info, task_data_dt)
         res = Starmap(self.core_task.__func__, all_args).reduce(self.combine)
         return res
 
