@@ -50,7 +50,6 @@ class UcerfClassicalCalculator(ClassicalCalculator):
         parallelizing on the sources according to their weight and
         tectonic region type.
         """
-        monitor = self.monitor(self.core_task.__name__)
         oq = self.oqparam
         acc = self.zerodict()
         self.nsites = []  # used in agg_dicts
@@ -59,10 +58,9 @@ class UcerfClassicalCalculator(ClassicalCalculator):
         for sm in self.csm.source_models:  # one branch at the time
             [grp] = sm.src_groups
             gsims = self.csm.info.get_gsims(sm.ordinal)
-            acc = parallel.Starmap.apply(
-                classical, (grp, self.src_filter, gsims, param, monitor),
+            acc = self.starmap_apply(
+                classical, (grp, self.src_filter, gsims, param),
                 weight=operator.attrgetter('weight'),
-                concurrent_tasks=oq.concurrent_tasks,
             ).reduce(self.agg_dicts, acc)
             ucerf = grp.sources[0].orig
             logging.info('Getting background sources from %s', ucerf.source_id)
@@ -70,7 +68,7 @@ class UcerfClassicalCalculator(ClassicalCalculator):
             for src in srcs:
                 self.csm.infos[src.source_id] = source.SourceInfo(src)
             acc = parallel.Starmap.apply(
-                classical, (srcs, self.src_filter, gsims, param, monitor),
+                classical, (srcs, self.src_filter, gsims, param),
                 weight=operator.attrgetter('weight'),
                 concurrent_tasks=oq.concurrent_tasks,
             ).reduce(self.agg_dicts, acc)

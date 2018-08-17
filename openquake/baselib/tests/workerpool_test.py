@@ -23,7 +23,6 @@ from openquake.baselib import config
 from openquake.baselib.workerpool import WorkerMaster, streamer
 from openquake.baselib.parallel import Starmap
 from openquake.baselib.general import _get_free_port
-from openquake.baselib.performance import Monitor
 
 
 def double(x, mon):
@@ -51,8 +50,7 @@ class WorkerPoolTestCase(unittest.TestCase):
         cls.master.start()
 
     def test(self):
-        mon = Monitor()
-        iterargs = ((i, mon) for i in range(10))
+        iterargs = ((i,) for i in range(10))
         smap = Starmap(double, iterargs, distribute='zmq')
         self.assertEqual(sum(res for res in smap), 90)
         # sum[0, 2, 4, 6, 8, 10, 12, 14, 16, 18]

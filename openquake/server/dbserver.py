@@ -26,7 +26,7 @@ import subprocess
 
 from openquake.baselib import config, sap, zeromq as z, workerpool as w
 from openquake.baselib.general import socket_ready, detach_process
-from openquake.baselib.parallel import safely_call
+from openquake.baselib.parallel import safely_call, Monitor
 from openquake.commonlib import logs
 from openquake.server.db import actions
 from openquake.server import dbapi

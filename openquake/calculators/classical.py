@@ -129,7 +129,7 @@ class ClassicalCalculator(base.HazardCalculator):
             return {}
         self.csm_info = self.datastore['csm_info']
         with self.monitor('managing sources', autoflush=True):
-            allargs = self.gen_args(self.monitor('classical'))
+            allargs = self.gen_args()
             iterargs = saving_sources_by_task(allargs, self.datastore)
             if isinstance(allargs, list):
                 # there is a trick here: if the arguments are known
@@ -137,7 +137,7 @@ class ClassicalCalculator(base.HazardCalculator):
                 # then the Starmap will understand the case of a single
                 # argument tuple and it will run in core the task
                 iterargs = list(iterargs)
-            ires = parallel.Starmap(
+            ires = self.starmap(
                 self.core_task.__func__, iterargs).submit_all()
         self.nsites = []
         acc = ires.reduce(self.agg_dicts, self.zerodict())
@@ -148,7 +148,7 @@ class ClassicalCalculator(base.HazardCalculator):
             self.store_source_info(self.csm.infos, acc)
         return acc
 
-    def gen_args(self, monitor):
+    def gen_args(self):
         """
         Used in the case of large source model logic trees.
 
@@ -176,14 +176,14 @@ class ClassicalCalculator(base.HazardCalculator):
         for sg in csm.src_groups:
             if sg.src_interdep == 'mutex' and len(sg) > 0:
                 gsims = self.csm.info.gsim_lt.get_gsims(sg.trt)
-                yield sg, src_filter, gsims, param, monitor
+                yield sg, src_filter, gsims, param
                 num_tasks += 1
                 num_sources += len(sg.sources)
         # NB: csm.get_sources_by_trt discards the mutex sources
         for trt, sources in csm.sources_by_trt.items():
             gsims = self.csm.info.gsim_lt.get_gsims(trt)
             for block in block_splitter(sources, maxweight, weight):
-                yield block, src_filter, gsims, param, monitor
+                yield block, src_filter, gsims, param
                 num_tasks += 1
                 num_sources += len(block)
         logging.info('Sent %d sources in %d tasks', num_sources, num_tasks)
@@ -193,14 +193,13 @@ class ClassicalCalculator(base.HazardCalculator):
         """
         :yields: pgetter, hstats, monitor
         """
-        monitor = self.monitor('build_hcurves_and_stats')
         hstats = self.oqparam.hazard_stats()
         for t in self.sitecol.split_in_tiles(self.oqparam.concurrent_tasks):
             pgetter = getters.PmapGetter(parent, self.rlzs_assoc, t.sids)
             if parent is self.datastore:  # read now, not in the workers
                 logging.info('Reading PoEs on %d sites', len(t))
                 pgetter.init()
-            yield pgetter, hstats, monitor
+            yield pgetter, hstats
 
     def save_hcurves(self, acc, pmap_by_kind):
         """
@@ -298,7 +297,7 @@ class ClassicalCalculator(base.HazardCalculator):
         self.datastore.flush()
         # self.datastore.hdf5.swmr = True  # start reading
         with self.monitor('sending pmaps', autoflush=True, measuremem=True):
-            ires = parallel.Starmap(
+            ires = self.starmap(
                 build_hcurves_and_stats, self.gen_getters(parent)
             ).submit_all()
         for kind, nbytes in ires.reduce(self.save_hcurves).items():

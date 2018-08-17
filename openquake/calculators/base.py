@@ -132,6 +132,14 @@ class BaseCalculator(metaclass=abc.ABCMeta):
         vars(mon).update(kw)
         return mon
 
+    def starmap(self, func, iterargs):
+        return Starmap(func, iterargs, self.monitor(func.__name__))
+
+    def starmap_apply(self, func, args):
+        ct = self.oqparam.concurrent_tasks
+        return Starmap.apply(func, args, self.monitor(func.__name__),
+                             concurrent_tasks=ct)
+
     def save_params(self, **kw):
         """
         Update the current calculation parameters and save engine_version
@@ -814,10 +822,11 @@ class RiskCalculator(HazardCalculator):
         """
         if not hasattr(self, 'riskinputs'):  # in the reportwriter
             return
-        mon = self.monitor('risk')
-        all_args = [(riskinput, self.riskmodel, self.param, mon)
+        all_args = [(riskinput, self.riskmodel, self.param)
                     for riskinput in self.riskinputs]
-        res = Starmap(self.core_task.__func__, all_args).reduce(self.combine)
+        res = self.starmap(
+            self.core_task.__func__, all_args
+        ).reduce(self.combine)
         return res
 
     def combine(self, acc, res):

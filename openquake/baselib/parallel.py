@@ -38,9 +38,7 @@ how you can solve the problem sequentially:
 >>> from itertools import starmap  # map a function with multiple arguments
 >>> from functools import reduce  # reduce an iterable with a binary operator
 >>> from operator import add  # addition function
->>> from openquake.baselib.performance import Monitor
->>> mon = Monitor('count')
->>> arglist = [('hello', mon), ('world', mon)]  # list of arguments
+>>> arglist = [('hello',), ('world',)]  # list of arguments
 >>> results = starmap(count, arglist)  # iterator over the results
 >>> res = reduce(add, results, collections.Counter())  # aggregated counts
 >>> sorted(res.items())  # counts per letter
@@ -338,7 +336,10 @@ class Result(object):
         return val
 
 
-def safely_call(func, args):
+dummy_mon = Monitor()
+
+
+def safely_call(func, args, mon=dummy_mon):
     """
     Call the given function with the given arguments safely, i.e.
     by trapping the exceptions. Return a pair (result, exc_type)
@@ -349,17 +350,12 @@ def safely_call(func, args):
     :param func: the function to call
     :param args: the arguments
     """
-    child = Monitor('total ' + func.__name__, measuremem=True)
     if args and hasattr(args[0], 'unpickle'):
         # args is a list of Pickled objects
         args = [a.unpickle() for a in args]
-    if args and isinstance(args[-1], Monitor):
-        mon = args[-1]
-        mon.operation = func.__name__
-        mon.children.append(child)  # child is a child of mon
-    else:  # in the DbServer
-        mon = child
-    if mon.queue is None:  # called from the DbServer
+    if mon is not dummy_mon:
+        args = list(args) + [mon]
+    if mon is None or mon.queue is None:  # called from the DbServer
         return getResult(func, args, mon)
     if not inspect.isgeneratorfunction(func):
         def func(*a, func=func):
@@ -558,8 +554,6 @@ def _wakeup(sec, mon):
 class Starmap(object):
     task_ids = []
     pids = []
-    calc_id = None
-    hdf5 = None
     manager = None
 
     @classmethod
@@ -570,9 +564,8 @@ class Starmap(object):
             cls.manager = None
         if distribute == 'processpool' and not hasattr(cls, 'pool'):
             cls.pool = multiprocessing.Pool(poolsize, init_workers)
-            m = Monitor('wakeup')
             ires = cls(
-                _wakeup, [(.2, m) for _ in range(cls.pool._processes)]
+                _wakeup, [(.2,) for _ in range(cls.pool._processes)]
             ).submit_all(logging.debug)
             cls.pids = list(ires)
             cls.task_ids = []
@@ -597,7 +590,7 @@ class Starmap(object):
     @classmethod
     def apply(cls, task, args, concurrent_tasks=cpu_count * 3,
               maxweight=None, weight=lambda item: 1,
-              key=lambda item: 'Unspecified', name=None,
+              key=lambda item: 'Unspecified', monitor=None,
               distribute=None, progress=logging.info):
         """
         Apply a task to a tuple of the form (sequence, \*other_args)
@@ -611,7 +604,7 @@ class Starmap(object):
         :param maxweight: if not None, used to split the tasks
         :param weight: function to extract the weight of an item in arg0
         :param key: function to extract the kind of an item in arg0
-        :param name: name of the task to be used in the log
+        :param monitor: Monitor instance
         :param distribute: if not given, inferred from OQ_DISTRIBUTE
         :param progress: logging function to use (default logging.info)
         :returns: an :class:`IterResult` object
@@ -623,14 +616,18 @@ class Starmap(object):
         else:
             chunks = split_in_blocks(arg0, concurrent_tasks or 1, weight, key)
         task_args = [(ch,) + args for ch in chunks]
-        return cls(task, task_args, name, distribute).submit_all(progress)
+        monitor = monitor or Monitor(task.__name__)
+        return cls(task, task_args, monitor, distribute).submit_all(progress)
 
-    def __init__(self, task_func, task_args, name=None, distribute=None):
+    def __init__(self, task_func, task_args, monitor=None, distribute=None):
         self.__class__.init(distribute=distribute or OQ_DISTRIBUTE)
+        self.monitor = monitor or Monitor(task_func.__name__)
         self.task_func = task_func
-        self.name = name or task_func.__name__
+        self.name = self.monitor.operation or task_func.__name__
         self.task_args = task_args
         self.distribute = distribute or oq_distribute(task_func)
+        if self.manager:
+            self.queue = self.monitor.queue = self.manager.Queue()
         # a task can be a function, a class or an instance with a __call__
         if inspect.isfunction(task_func):
             self.argnames = inspect.getargspec(task_func).args
@@ -640,7 +637,15 @@ class Starmap(object):
             self.argnames = inspect.getargspec(task_func.__call__).args[1:]
         self.receiver = 'tcp://%s:%s' % (
             config.dbserver.listen, config.dbserver.receiver_ports)
-        self.sent = numpy.zeros(len(self.argnames))
+        self.sent = numpy.zeros(len(self.argnames) - 1)
+        if self.monitor.hdf5:
+            h5 = self.monitor.hdf5
+            task_info = 'task_info/' + self.name
+            # create task_info and performance_data if needed
+            if task_info not in h5:
+                hdf5.create(h5, task_info, task_data_dt)
+            if 'performance_data' not in h5:
+                hdf5.create(h5, 'performance_data', perf_dt)
 
     @property
     def num_tasks(self):
@@ -659,30 +664,14 @@ class Starmap(object):
         Add .task_no and .weight to the monitor and yield back
         the arguments by pickling them.
         """
-        task_info = 'task_info/' + self.name
+        self.monitor.backurl = backurl
         for task_no, args in enumerate(self.task_args, 1):
-            mon = args[-1]
-            assert isinstance(mon, Monitor), mon
-            if task_no == 1:  # first time
-                if backurl:
-                    mon.backurl = backurl
-                else:
-                    self.queue = mon.queue = self.manager.Queue()
-                if mon.hdf5:
-                    self.hdf5 = mon.hdf5
-                    # create task_info and performance_data if needed
-                    if task_info not in self.hdf5:
-                        hdf5.create(mon.hdf5, task_info, task_data_dt)
-                    if 'performance_data' not in self.hdf5:
-                        hdf5.create(mon.hdf5, 'performance_data', perf_dt)
-
             # add incremental task number and task weight
-            mon.task_no = task_no
-            mon.weight = getattr(args[0], 'weight', 1.)
-            self.calc_id = getattr(mon, 'calc_id', None)
+            self.monitor.task_no = task_no
+            self.monitor.weight = getattr(args[0], 'weight', 1.)
             if pickle:
-                args = pickle_sequence(args)
-                self.sent += numpy.array([len(p) for p in args])
+                piks = pickle_sequence(args)
+                self.sent += numpy.array([len(p) for p in piks])
             yield args
 
     def submit_all(self, progress=logging.info):
@@ -701,7 +690,7 @@ class Starmap(object):
             it = self._iter_dask()
         num_tasks = next(it)
         return IterResult(it, self.name, self.argnames, num_tasks,
-                          self.sent, progress, self.hdf5)
+                          self.sent, progress, self.monitor.hdf5)
 
     def reduce(self, agg=operator.add, acc=None, progress=logging.info):
         """
@@ -716,12 +705,13 @@ class Starmap(object):
         allargs = list(self._genargs(pickle=False))
         yield len(allargs)
         for args in allargs:
-            num_results = safely_call(self.task_func, args)
+            num_results = safely_call(self.task_func, args, self.monitor)
             for _ in range(num_results):
                 yield self.queue.get()
 
     def _iter_pool(self):
-        safefunc = functools.partial(safely_call, self.task_func)
+        safefunc = functools.partial(safely_call, self.task_func,
+                                     mon=self.monitor)
         allargs = list(self._genargs())
         yield len(allargs)
         for num_results in self.pool.imap_unordered(safefunc, allargs):
@@ -739,7 +729,7 @@ class Starmap(object):
             logging.info('Using receiver %s', backurl)
             results = []
             for piks in self._genargs(backurl):
-                res = safetask.delay(self.task_func, piks)
+                res = safetask.delay(self.task_func, piks, self.monitor)
                 # populating Starmap.task_ids, used in celery_cleanup
                 self.task_ids.append(res.task_id)
                 results.append(res)
@@ -747,11 +737,12 @@ class Starmap(object):
             yield num_results
             it = self.iter_native(results)
             isocket = iter(socket)
+            calc_id = self.monitor.calc_id
             while num_results:
                 res = next(isocket)
-                if self.calc_id and self.calc_id != res.mon.calc_id:
+                if calc_id and calc_id != res.mon.calc_id:
                     logging.warn('Discarding a result from job %d, since this '
-                                 'is job %d', res.mon.calc_id, self.calc_id)
+                                 'is job %d', res.mon.calc_id, calc_id)
                     continue
                 err = next(it)
                 if isinstance(err, Exception):  # TaskRevokedError
@@ -771,17 +762,19 @@ class Starmap(object):
                     num_results += 1
             yield num_results
             isocket = iter(socket)
+            calc_id = self.monitor.calc_id
             while num_results:
                 res = next(isocket)
-                if self.calc_id and self.calc_id != res.mon.calc_id:
+                if calc_id and calc_id != res.mon.calc_id:
                     logging.warn('Discarding a result from job %d, since this '
-                                 'is job %d', res.mon.calc_id, self.calc_id)
+                                 'is job %d', res.mon.calc_id, calc_id)
                     continue
                 num_results -= 1
                 yield res
 
     def _iter_dask(self):
-        safefunc = functools.partial(safely_call, self.task_func)
+        safefunc = functools.partial(safely_call, self.task_func,
+                                     mon=self.monitor)
         allargs = list(self._genargs())
         yield len(allargs)
         cl = self.dask_client

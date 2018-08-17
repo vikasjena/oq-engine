@@ -290,7 +290,7 @@ class UCERFHazardCalculator(event_based.EventBasedCalculator):
         return UcerfFilter(
             self.sitecol, self.oqparam.maximum_distance), self.csm
 
-    def gen_args(self, monitor):
+    def gen_args(self):
         """
         Generate a task for each branch
         """
@@ -310,7 +310,7 @@ class UCERFHazardCalculator(event_based.EventBasedCalculator):
                              gmf=oq.ground_motion_fields,
                              min_iml=self.get_min_iml(oq))
                 allargs.append((srcs, self.src_filter, rlzs_by_gsim[sm_id],
-                                param, monitor))
+                                param))
         return allargs
 
 
@@ -390,13 +390,13 @@ class UCERFRiskCalculator(EbrCalculator):
                              min_iml=min_iml,
                              oqparam=oq,
                              insured_losses=oq.insured_losses)
-                yield ssm, src_filter, param, self.riskmodel, monitor
+                yield ssm, src_filter, param, self.riskmodel
 
     def execute(self):
         self.riskmodel.taxonomy = self.assetcol.tagcol.taxonomy
         num_rlzs = len(self.rlzs_assoc.realizations)
         self.grp_trt = self.csm_info.grp_by("trt")
-        res = parallel.Starmap(compute_losses, self.gen_args()).submit_all()
+        res = self.starmap(compute_losses, self.gen_args()).submit_all()
         self.vals = self.assetcol.values()
         self.eff_ruptures = AccumDict(accum=0)
         num_events = self.save_results(res, num_rlzs)

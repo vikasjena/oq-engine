@@ -28,12 +28,11 @@ except ImportError:
     celery = None
 
 
-def get_length(data, monitor):
+def get_length(data, monitor=None):
     return {'n': len(data)}
 
 
 class StarmapTestCase(unittest.TestCase):
-    monitor = parallel.Monitor()
 
     @classmethod
     def setUpClass(cls):
@@ -41,7 +40,7 @@ class StarmapTestCase(unittest.TestCase):
 
     def test_apply(self):
         res = parallel.Starmap.apply(
-            get_length, (numpy.arange(10), self.monitor),
+            get_length, (numpy.arange(10),),
             concurrent_tasks=3).reduce()
         self.assertEqual(res, {'n': 10})  # chunks [4, 4, 2]
 
@@ -49,7 +48,7 @@ class StarmapTestCase(unittest.TestCase):
     # generated even if everything is run in a single core
     def test_apply_no_tasks(self):
         res = parallel.Starmap.apply(
-            get_length, ('aaabb', self.monitor),
+            get_length, ('aaabb',),
             concurrent_tasks=0, key=lambda char: char)
         # chunks [['a', 'a', 'a'], ['b', 'b']]
         partial_sums = sorted(dic['n'] for dic in res)
@@ -57,7 +56,7 @@ class StarmapTestCase(unittest.TestCase):
 
     def test_apply_maxweight(self):
         res = parallel.Starmap.apply(
-            get_length, ('aaabb', self.monitor), maxweight=2,
+            get_length, ('aaabb',), maxweight=2,
             key=lambda char: char)
         # chunks ['aa', 'ab', 'b']
         partial_sums = sorted(dic['n'] for dic in res)
@@ -70,7 +69,7 @@ class StarmapTestCase(unittest.TestCase):
         res = {}
         for key, data in all_data:
             res[key] = parallel.Starmap(
-                get_length, [(data, self.monitor)]).submit_all()
+                get_length, [(data,)]).submit_all()
         for key, val in res.items():
             res[key] = val.reduce()
         self.assertEqual(res, {'a': {'n': 10}, 'c': {'n': 15}, 'b': {'n': 20}})
@@ -82,12 +81,11 @@ class StarmapTestCase(unittest.TestCase):
 
 class ThreadPoolTestCase(unittest.TestCase):
     def test(self):
-        monitor = parallel.Monitor()
         with mock.patch.dict(os.environ, {'OQ_DISTRIBUTE': 'threadpool'}):
             parallel.Starmap.init()
             try:
                 res = parallel.Starmap.apply(
-                    get_length, (numpy.arange(10), monitor),
+                    get_length, (numpy.arange(10),),
                     concurrent_tasks=3).reduce()
                 self.assertEqual(res, {'n': 10})  # chunks [4, 4, 2]
             finally:

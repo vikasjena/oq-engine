@@ -190,7 +190,7 @@ class EventBasedCalculator(base.HazardCalculator):
     core_task = compute_hazard
     is_stochastic = True
 
-    def gen_args(self, monitor):
+    def gen_args(self):
         """
         :yields: the arguments for compute_gmfs_and_curves
         """
@@ -212,7 +212,7 @@ class EventBasedCalculator(base.HazardCalculator):
                     rlzs_by_gsim = self.rlzs_by_gsim_grp[grp_id]
                     ruptures = RuptureGetter(parent, slc, grp_id)
                     param['samples'] = samples_by_grp[grp_id]
-                    yield ruptures, self.sitecol, rlzs_by_gsim, param, monitor
+                    yield ruptures, self.sitecol, rlzs_by_gsim, param
             return
 
         maxweight = self.csm.get_maxweight(weight, concurrent_tasks or 1)
@@ -225,12 +225,12 @@ class EventBasedCalculator(base.HazardCalculator):
                 rlzs_by_gsim = self.rlzs_by_gsim_grp[sg.id]
                 self.csm.add_infos(sg.sources)
                 if sg.src_interdep == 'mutex':  # do not split
-                    yield sg, self.src_filter, rlzs_by_gsim, param, monitor
+                    yield sg, self.src_filter, rlzs_by_gsim, param
                     num_tasks += 1
                     num_sources += len(sg.sources)
                     continue
                 for block in block_splitter(sg.sources, maxweight, weight):
-                    yield block, self.src_filter, rlzs_by_gsim, param, monitor
+                    yield block, self.src_filter, rlzs_by_gsim, param
                     num_tasks += 1
                     num_sources += len(block)
         logging.info('Sent %d sources in %d tasks', num_sources, num_tasks)
@@ -352,7 +352,7 @@ class EventBasedCalculator(base.HazardCalculator):
         self.indices = collections.defaultdict(list)  # sid, idx -> indices
         acc = self.zerodict()
         with self.monitor('managing sources', autoflush=True):
-            allargs = self.gen_args(self.monitor('classical'))
+            allargs = self.gen_args()
             iterargs = saving_sources_by_task(allargs, self.datastore)
             if isinstance(allargs, list):
                 # there is a trick here: if the arguments are known
@@ -362,7 +362,7 @@ class EventBasedCalculator(base.HazardCalculator):
                 iterargs = list(iterargs)
             if self.oqparam.ground_motion_fields is False:
                 logging.info('Generating ruptures only')
-            ires = parallel.Starmap(
+            ires = self.starmap(
                 self.core_task.__func__, iterargs
             ).submit_all()
         acc = ires.reduce(self.agg_dicts, acc)

@@ -306,9 +306,9 @@ class SourceFilter(object):
         :returns: a dictionary src_group_id -> sources
         """
         sources_by_grp = Starmap.apply(
-            prefilter, (sources, self, monitor),
+            prefilter, (sources, self),
             concurrent_tasks=concurrent_tasks, distribute=self.distribute,
-            name=self.__class__.__name__, progress=logging.debug).reduce()
+            monitor=monitor, progress=logging.debug).reduce()
         Starmap.shutdown()  # close the processpool
         Starmap.init()  # reopen it when necessary
         # avoid task ordering issues
