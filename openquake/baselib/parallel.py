@@ -349,43 +349,50 @@ def safely_call(func, args):
     :param func: the function to call
     :param args: the arguments
     """
-    with Monitor('total ' + func.__name__, measuremem=True) as child:
-        if args and hasattr(args[0], 'unpickle'):
-            # args is a list of Pickled objects
-            args = [a.unpickle() for a in args]
-        if args and isinstance(args[-1], Monitor):
-            mon = args[-1]
-            mon.operation = func.__name__
-            mon.children.append(child)  # child is a child of mon
-        else:  # in the DbServer
-            mon = child
+    child = Monitor('total ' + func.__name__, measuremem=True)
+    if args and hasattr(args[0], 'unpickle'):
+        # args is a list of Pickled objects
+        args = [a.unpickle() for a in args]
+    if args and isinstance(args[-1], Monitor):
+        mon = args[-1]
+        mon.operation = func.__name__
+        mon.children.append(child)  # child is a child of mon
+    else:  # in the DbServer
+        mon = child
+    if not inspect.isgeneratorfunction(func):
+        def func(*a, func=func):
+            yield func(*a)
+    return _consume(func(*args), mon)
+
+
+def _consume(genobj, mon):
+    if mon.backurl:
+        zsocket = Socket(mon.backurl, zmq.PUSH, 'connect')
+        zsocket.__enter__()
+    else:
+        send = mon.queue.put
+    num_sent = 0
+    while True:
         try:
-            res = Result(func(*args), mon)
+            with mon:
+                val = next(genobj)
+        except StopIteration:
+            break
         except Exception:
             _etype, exc, tb = sys.exc_info()
             res = Result(exc, mon, ''.join(traceback.format_tb(tb)))
-    # FIXME: check_mem_usage is disabled here because it's causing
-    # dead locks in threads when log messages are raised.
-    # Check is done anyway in other parts of the code
-    # further investigation is needed
-    # check_mem_usage(mon)  # check if too much memory is used
-    if mon.backurl is None:  # processpool
+        else:
+            res = Result(val, mon)
         try:
-            mon.queue.put(res)
+            send(res)
         except Exception:  # like OverflowError
             _etype, exc, tb = sys.exc_info()
             err = Result(exc, mon, ''.join(traceback.format_tb(tb)))
-            mon.queue.put(err)
-        return 1
-    # cluster
-    with Socket(mon.backurl, zmq.PUSH, 'connect') as zsocket:
-        try:
-            zsocket.send(res)
-        except Exception:  # like OverflowError
-            _etype, exc, tb = sys.exc_info()
-            err = Result(exc, mon, ''.join(traceback.format_tb(tb)))
-            zsocket.send(err)
-    return zsocket.num_sent
+            send(err)
+        num_sent += 1
+    if mon.backurl:
+        zsocket.__close__(None, None, None)
+    return num_sent
 
 
 if OQ_DISTRIBUTE.startswith('celery'):
