@@ -77,6 +77,8 @@ class Monitor(object):
     address = None
     authkey = None
     calc_id = None
+    backurl = None
+    queue = None
 
     def __init__(self, operation='dummy', hdf5=None,
                  autoflush=False, measuremem=False):

@@ -145,7 +145,6 @@ fast sources.
 """
 import os
 import sys
-import mock
 import time
 import socket
 import signal
@@ -157,7 +156,7 @@ import functools
 import itertools
 import traceback
 import collections
-import multiprocessing.dummy
+import multiprocessing
 import psutil
 import numpy
 try:
@@ -182,6 +181,17 @@ if OQ_DISTRIBUTE == 'futures':  # legacy name
 if OQ_DISTRIBUTE not in ('no', 'processpool', 'threadpool', 'celery', 'zmq',
                          'dask'):
     raise ValueError('Invalid oq_distribute=%s' % OQ_DISTRIBUTE)
+
+if sys.version >= '3.6':  # fix multiprocessing bug
+
+    from multiprocessing import managers
+    autoproxy_old = managers.AutoProxy
+
+    def autoproxy(token, serializer, manager=None, authkey=None,
+                  exposed=None, incref=True, manager_owned=True):
+        return autoproxy_old(token, serializer, manager, authkey,
+                             exposed, incref)
+    managers.AutoProxy = autoproxy
 
 # data type for storing the performance information
 task_data_dt = numpy.dtype(
@@ -359,10 +369,16 @@ def safely_call(func, args):
     # Check is done anyway in other parts of the code
     # further investigation is needed
     # check_mem_usage(mon)  # check if too much memory is used
-    backurl = getattr(mon, 'backurl', None)
-    if backurl is None:
-        return res
-    with Socket(backurl, zmq.PUSH, 'connect') as zsocket:
+    if mon.backurl is None:  # processpool
+        try:
+            mon.queue.put(res)
+        except Exception:  # like OverflowError
+            _etype, exc, tb = sys.exc_info()
+            err = Result(exc, mon, ''.join(traceback.format_tb(tb)))
+            mon.queue.put(err)
+        return 1
+    # cluster
+    with Socket(mon.backurl, zmq.PUSH, 'connect') as zsocket:
         try:
             zsocket.send(res)
         except Exception:  # like OverflowError
@@ -528,9 +544,14 @@ class Starmap(object):
     pids = []
     calc_id = None
     hdf5 = None
+    manager = None
 
     @classmethod
     def init(cls, poolsize=None, distribute=OQ_DISTRIBUTE):
+        if distribute in ('processpool', 'threadpool', 'no'):
+            cls.manager = multiprocessing.Manager()
+        else:
+            cls.manager = None
         if distribute == 'processpool' and not hasattr(cls, 'pool'):
             cls.pool = multiprocessing.Pool(poolsize, init_workers)
             m = Monitor('wakeup')
@@ -626,18 +647,22 @@ class Starmap(object):
         for task_no, args in enumerate(self.task_args, 1):
             mon = args[-1]
             assert isinstance(mon, Monitor), mon
-            if mon.hdf5 and task_no == 1:
-                self.hdf5 = mon.hdf5
-                if task_info not in self.hdf5:  # first time
-                    # task_info performance_data should be generated in advance
-                    hdf5.create(mon.hdf5, task_info, task_data_dt)
-                if 'performance_data' not in self.hdf5:
-                    hdf5.create(mon.hdf5, 'performance_data', perf_dt)
+            if task_no == 1:  # first time
+                if backurl:
+                    mon.backurl = backurl
+                else:
+                    self.queue = mon.queue = self.manager.Queue()
+                if mon.hdf5:
+                    self.hdf5 = mon.hdf5
+                    # create task_info and performance_data if needed
+                    if task_info not in self.hdf5:
+                        hdf5.create(mon.hdf5, task_info, task_data_dt)
+                    if 'performance_data' not in self.hdf5:
+                        hdf5.create(mon.hdf5, 'performance_data', perf_dt)
 
             # add incremental task number and task weight
             mon.task_no = task_no
             mon.weight = getattr(args[0], 'weight', 1.)
-            mon.backurl = backurl
             self.calc_id = getattr(mon, 'calc_id', None)
             if pickle:
                 args = pickle_sequence(args)
@@ -675,14 +700,17 @@ class Starmap(object):
         allargs = list(self._genargs(pickle=False))
         yield len(allargs)
         for args in allargs:
-            yield safely_call(self.task_func, args)
+            num_results = safely_call(self.task_func, args)
+            for _ in range(num_results):
+                yield self.queue.get()
 
     def _iter_pool(self):
         safefunc = functools.partial(safely_call, self.task_func)
         allargs = list(self._genargs())
         yield len(allargs)
-        for res in self.pool.imap_unordered(safefunc, allargs):
-            yield res
+        for num_results in self.pool.imap_unordered(safefunc, allargs):
+            for _ in range(num_results):
+                yield self.queue.get()
 
     def iter_native(self, results):
         for task_id, result_dict in ResultSet(results).iter_native():
