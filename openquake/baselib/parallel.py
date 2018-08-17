@@ -359,10 +359,26 @@ def safely_call(func, args):
         mon.children.append(child)  # child is a child of mon
     else:  # in the DbServer
         mon = child
+    if mon.queue is None:  # called from the DbServer
+        return getResult(func, args, mon)
     if not inspect.isgeneratorfunction(func):
         def func(*a, func=func):
             yield func(*a)
     return _consume(func(*args), mon)
+
+
+def getResult(func, args, mon):
+    with mon:
+        try:
+            val = func(*args)
+        except StopIteration:
+            res = None
+        except Exception:
+            _etype, exc, tb = sys.exc_info()
+            res = Result(exc, mon, ''.join(traceback.format_tb(tb)))
+        else:
+            res = Result(val, mon)
+    return res
 
 
 def _consume(genobj, mon):
@@ -373,16 +389,9 @@ def _consume(genobj, mon):
         send = mon.queue.put
     num_sent = 0
     while True:
-        try:
-            with mon:
-                val = next(genobj)
-        except StopIteration:
+        res = getResult(next, (genobj,), mon)
+        if res is None:  # StopIteration
             break
-        except Exception:
-            _etype, exc, tb = sys.exc_info()
-            res = Result(exc, mon, ''.join(traceback.format_tb(tb)))
-        else:
-            res = Result(val, mon)
         try:
             send(res)
         except Exception:  # like OverflowError
