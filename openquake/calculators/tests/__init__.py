@@ -108,8 +108,8 @@ class CalculatorTestCase(unittest.TestCase):
             duration[inis[1]] = calc._monitor.duration
             self.calc = calc
         # reopen datastore, since some tests need to export from it
-        dstore = datastore.read(self.calc.datastore.calc_id)
-        self.calc.datastore = dstore
+        # dstore = datastore.read(self.calc.datastore.calc_id)
+        # self.calc.datastore = dstore
         self.__class__.duration += duration
         return result
 
