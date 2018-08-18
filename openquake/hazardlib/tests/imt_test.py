@@ -17,56 +17,48 @@ import unittest
 import pickle
 from openquake.hazardlib import imt as imt_module
 
+TestIMT = imt_module.imt.add('TestIMT', 'test IMT', 'foo, bar')
+
 
 class BaseIMTTestCase(unittest.TestCase):
-    class TestIMT(imt_module._IMT):
-        _fields = ('foo', 'bar')
-
-        def __new__(cls, foo, bar):
-            return imt_module._IMT.__new__(cls, foo, bar)
 
     def test_base(self):
-        self.assertEqual(getattr(self.TestIMT, '__slots__'), ())
-        self.assertFalse(hasattr(self.TestIMT(1, 2), '__dict__'))
-        imt = self.TestIMT(bar=2, foo=1)
-        self.assertEqual(str(imt), 'TestIMT')
+        imt = TestIMT(bar=2, foo=1)
+        self.assertEqual(str(imt), 'TestIMT(1, 2)')
 
     def test_equality(self):
-        self.assertTrue(self.TestIMT(1, 1) == self.TestIMT(1, 1))
-        self.assertTrue(self.TestIMT(1, 5) == self.TestIMT(1, 5))
-        self.assertTrue(self.TestIMT('foo', 'bar') ==
-                        self.TestIMT('foo', 'bar'))
+        self.assertTrue(TestIMT(1, 1) == TestIMT(1, 1))
+        self.assertTrue(TestIMT(1, 5) == TestIMT(1, 5))
+        self.assertTrue(TestIMT('foo', 'bar') ==
+                        TestIMT('foo', 'bar'))
 
-        self.assertFalse(self.TestIMT(1, 1) != self.TestIMT(1, 1))
-        self.assertFalse(self.TestIMT(1, 5) != self.TestIMT(1, 5))
-        self.assertFalse(self.TestIMT('foo', 'bar') !=
-                         self.TestIMT('foo', 'bar'))
+        self.assertFalse(TestIMT(1, 1) != TestIMT(1, 1))
+        self.assertFalse(TestIMT(1, 5) != TestIMT(1, 5))
+        self.assertFalse(TestIMT('foo', 'bar') !=
+                         TestIMT('foo', 'bar'))
 
-        self.assertFalse(self.TestIMT(1, 1) == (1, 1))
-        self.assertFalse(self.TestIMT(0, 1) == self.TestIMT(1, 1))
-        self.assertFalse(self.TestIMT(1, 5.4) == self.TestIMT(1, 5))
-        self.assertFalse(self.TestIMT('foo', 'bar') ==
-                         self.TestIMT('fooz', 'bar'))
-        self.assertFalse(self.TestIMT('foo', 'bar') == ('foo', 'bar'))
-        self.assertFalse(self.TestIMT(False, False) is False)
+        self.assertFalse(TestIMT(1, 1) == (1, 1))
+        self.assertFalse(TestIMT(0, 1) == TestIMT(1, 1))
+        self.assertFalse(TestIMT(1, 5.4) == TestIMT(1, 5))
+        self.assertFalse(TestIMT('foo', 'bar') ==
+                         TestIMT('fooz', 'bar'))
+        self.assertFalse(TestIMT('foo', 'bar') == ('foo', 'bar'))
+        self.assertFalse(TestIMT(False, False) is False)
 
-        self.assertTrue(self.TestIMT(1, 1) != (1, 1))
-        self.assertTrue(self.TestIMT(0, 1) != self.TestIMT(1, 1))
-        self.assertTrue(self.TestIMT(1, 5.4) != self.TestIMT(1, 5))
-        self.assertTrue(self.TestIMT('foo', 'bar') !=
-                        self.TestIMT('fooz', 'bar'))
-        self.assertTrue(self.TestIMT('foo', 'bar') != ('foo', 'bar'))
+        self.assertTrue(TestIMT(1, 1) != (1, 1))
+        self.assertTrue(TestIMT(0, 1) != TestIMT(1, 1))
+        self.assertTrue(TestIMT(1, 5.4) != TestIMT(1, 5))
+        self.assertTrue(TestIMT('foo', 'bar') !=
+                        TestIMT('fooz', 'bar'))
+        self.assertTrue(TestIMT('foo', 'bar') != ('foo', 'bar'))
 
     def test_hash(self):
-        imt1 = self.TestIMT('some', 'thing')
-        self.assertEqual(hash(imt1), hash(self.TestIMT('some', 'thing')))
-        self.assertNotEqual(hash(imt1), hash(self.TestIMT('other', 'thing')))
+        imt1 = TestIMT('some', 'thing')
+        self.assertEqual(hash(imt1), hash(TestIMT('some', 'thing')))
+        self.assertNotEqual(hash(imt1), hash(TestIMT('other', 'thing')))
 
-        class TestIMT2(self.TestIMT):
-            pass
-
-        imt2 = TestIMT2('some', 'thing')
-        self.assertNotEqual(hash(imt1), hash(imt2))
+        imt2 = TestIMT('some', 'thing')
+        self.assertEqual(hash(imt1), hash(imt2))
 
     def test_pickeable(self):
         for imt in (imt_module.PGA(), imt_module.SA(0.2)):
@@ -81,10 +73,10 @@ class BaseIMTTestCase(unittest.TestCase):
 
     def test_from_string(self):
         sa = imt_module.from_string('SA(0.1)')
-        self.assertEqual(sa, ('SA', 0.1, 5.0))
+        self.assertEqual(sa, ('SA', 0.1))
         pga = imt_module.from_string('PGA')
-        self.assertEqual(pga, ('PGA', None, None))
-        with self.assertRaises(ValueError):
+        self.assertEqual(pga, ('PGA',))
+        with self.assertRaises(AttributeError):
             imt_module.from_string('XXX')
 
 
