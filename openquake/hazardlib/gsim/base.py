@@ -616,7 +616,7 @@ class CoeffsTable(object):
     >>> ct[imt.PGV()]
     Traceback (most recent call last):
         ...
-    KeyError: PGV()
+    KeyError: PGV
     >>> ct[imt.SA(1.0, 4)]
     Traceback (most recent call last):
         ...

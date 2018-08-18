@@ -31,9 +31,9 @@ class IMTtuple(tuple):
     def new(cls, string, params=''):
         """
         >>> IMTtuple.new('PGA')
-        PGA()
+        PGA
         >>> IMTtuple.new('PGA()')
-        PGA()
+        PGA
         >>> IMTtuple.new('SA(0.10)', 'period, damping')
         SA(0.1)
         >>> IMTtuple.new('SA(0.1, 4)', 'period, damping')
@@ -63,6 +63,8 @@ class IMTtuple(tuple):
         return self[0]
 
     def __repr__(self):
+        if len(self) == 1:  # no arguments, return the prefix
+            return self[0]
         return '%s(%s)' % (self[0], ', '.join(map(repr, self[1:])))
 
 

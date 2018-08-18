@@ -293,11 +293,12 @@ class OqParam(valid.ParamSet):
         """
         :param gsims: a sequence of GSIM instances
         """
-        imts = set(map(from_string, self.imtls))
+        imts = set(from_string(imt).prefix for imt in self.imtls)
         for gsim in gsims:
-            restrict_imts = gsim.DEFINED_FOR_INTENSITY_MEASURE_TYPES
+            fs = gsim.DEFINED_FOR_INTENSITY_MEASURE_TYPES
+            restrict_imts = set(f.__name__ for f in fs)
             if restrict_imts:
-                invalid_imts = ', '.join(map(repr, imts - restrict_imts))
+                invalid_imts = ', '.join(imts - restrict_imts)
                 if invalid_imts:
                     raise ValueError(
                         'The IMT %s is not accepted by the GSIM %s' %

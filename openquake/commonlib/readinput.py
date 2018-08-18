@@ -894,8 +894,6 @@ def get_pmap_from_nrml(oqparam, fname):
         oqparam.investigation_time = hcurves['investigationTime']
         if imt == 'SA':
             imt += '(%s)' % hcurves['saPeriod']
-        else:
-            imt += '()'
         imtls[imt] = ~hcurves.IMLs
         data = sorted((~node.Point.pos, ~node.poEs) for node in hcurves[1:])
         hcurves_by_imt[imt] = numpy.array([d[1] for d in data])
