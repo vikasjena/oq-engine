@@ -213,10 +213,9 @@ class AmplificationTable(object):
         # Levels by Distances
         if imt.is_(imt_module.PGA, imt_module.PGV):
             interpolator = interp1d(self.magnitudes,
-                                    numpy.log10(self.mean[str(imt)]), axis=2)
+                                    numpy.log10(self.mean[imt.prefix]), axis=2)
             output_table = 10.0 ** (
-                interpolator(rctx.mag).reshape(self.shape[0], self.shape[3])
-                )
+                interpolator(rctx.mag).reshape(self.shape[0], self.shape[3]))
         else:
             # For spectral accelerations - need two step process
             # Interpolate period - log-log space
@@ -244,7 +243,7 @@ class AmplificationTable(object):
             # For PGA and PGV only needs to apply magnitude interpolation
             if imt.is_(imt_module.PGA, imt_module.PGV):
                 interpolator = interp1d(self.magnitudes,
-                                        self.sigma[stddev_type][str(imt)],
+                                        self.sigma[stddev_type][imt.prefix],
                                         axis=2)
                 output_tables.append(
                     interpolator(rctx.mag).reshape(self.shape[0],
@@ -355,7 +354,7 @@ class GMPETable(GMPE):
         # Load intensity measure types and levels
         self.imls = hdf_arrays_to_dict(fle["IMLs"])
         self.DEFINED_FOR_INTENSITY_MEASURE_TYPES = set(self._supported_imts())
-        if "SA" in self.imls.keys() and "T" not in self.imls:
+        if "SA" in self.imls and "T" not in self.imls:
             raise ValueError("Spectral Acceleration must be accompanied by "
                              "periods")
         # Get the standard deviations
@@ -410,10 +409,10 @@ class GMPETable(GMPE):
                 continue
             else:
                 try:
-                    imt_val = imt_module.from_string(key)
-                except:
+                    factory = getattr(imt_module.imt, key)
+                except Exception:
                     continue
-                imt_list.append(imt_val.__class__)
+                imt_list.append(factory)
         return imt_list
 
     def get_mean_and_stddevs(self, sctx, rctx, dctx, imt, stddev_types):
@@ -509,9 +508,9 @@ class GMPETable(GMPE):
         if imt.is_(imt_module.PGA, imt_module.PGV):
             # Get scalar imt
             if val_type == "IMLs":
-                iml_table = self.imls[str(imt)][:]
+                iml_table = self.imls[imt.prefix][:]
             else:
-                iml_table = self.stddevs[val_type][str(imt)][:]
+                iml_table = self.stddevs[val_type][imt.prefix][:]
             n_d, n_s, n_m = iml_table.shape
             iml_table = iml_table.reshape([n_d, n_m])
         else:
