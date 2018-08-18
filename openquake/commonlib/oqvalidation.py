@@ -297,7 +297,7 @@ class OqParam(valid.ParamSet):
         for gsim in gsims:
             restrict_imts = gsim.DEFINED_FOR_INTENSITY_MEASURE_TYPES
             if restrict_imts:
-                invalid_imts = ', '.join(imts - restrict_imts)
+                invalid_imts = ', '.join(map(repr, imts - restrict_imts))
                 if invalid_imts:
                     raise ValueError(
                         'The IMT %s is not accepted by the GSIM %s' %
