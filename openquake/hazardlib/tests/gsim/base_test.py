@@ -37,7 +37,7 @@ aac = numpy.testing.assert_allclose
 
 
 class _FakeGSIMTestCase(unittest.TestCase):
-    DEFAULT_IMT = PGA
+    DEFAULT_IMT = staticmethod(PGA)
     DEFAULT_COMPONENT = const.IMC.GMRotI50
 
     def setUp(self):
