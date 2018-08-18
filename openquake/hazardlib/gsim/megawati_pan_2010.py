@@ -84,7 +84,7 @@ class MegawatiPan2010(GMPE):
         C = self.COEFFS[imt]
         mean = (self._get_magnitude_scaling(C, rup.mag) +
                 self._get_distance_scaling(C, rup.mag, dists.rhypo))
-        if imt.is_(PGA, SA):
+        if imt.prefix in "SA PGA" SA):
             mean = np.log(np.exp(mean) / (100.0 * g))
         stddevs = self._compute_std(C, stddev_types, len(dists.rhypo))
         return mean, stddevs

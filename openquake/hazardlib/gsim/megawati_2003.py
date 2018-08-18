@@ -79,7 +79,7 @@ class MegawatiEtAl2003(GMPE):
                 self._get_distance_scaling(coe, dists.rhypo) +
                 self._get_azimuth_correction(coe, dists.azimuth))
         # Convert to g
-        if imt.is_(PGA, SA):
+        if imt.prefix in "SA PGA" SA):
             mean = np.log(np.exp(mean) / (100.0 * g))
         # Compute std
         stddevs = self._compute_std(coe, stddev_types, dists.azimuth.shape)

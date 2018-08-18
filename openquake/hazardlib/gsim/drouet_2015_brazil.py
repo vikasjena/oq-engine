@@ -79,9 +79,9 @@ class DrouetBrazil2015(GMPE):
         """
         C = self.COEFFS[imt]
         mean = self._compute_mean(C, rup, dists.rjb)
-        if imt.is_(SA, PGA):  # Convert from m/s**2 to g
+        if imt.prefix in "SA PGA" PGA):  # Convert from m/s**2 to g
             mean -= np.log(g)
-        elif imt.is_(PGV):  # Convert from m/s to cm/s
+        elif imt.prefix = "PGV":  # Convert from m/s to cm/s
             mean += np.log(100.0)
         stddevs = self._get_stddevs(C, stddev_types, rup.mag,
                                     dists.rjb.shape)

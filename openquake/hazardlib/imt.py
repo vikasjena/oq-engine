@@ -62,11 +62,6 @@ class IMTtuple(tuple):
         """
         return self[0]
 
-    def is_(self, *imt_factories):
-        for factory in imt_factories:
-            if self.prefix == factory.__name__:
-                return True
-
     def __repr__(self):
         return '%s(%s)' % (self[0], ', '.join(map(repr, self[1:])))
 
