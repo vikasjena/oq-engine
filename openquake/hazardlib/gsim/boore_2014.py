@@ -92,7 +92,7 @@ class BooreEtAl2014(GMPE):
         # intensity measure type.
         C = self.COEFFS[imt]
         C_PGA = self.COEFFS[PGA()]
-        if isinstance(imt, (PGA, PGV)):
+        if imt.is_(PGA, PGV):
             imt_per = 0.0
         else:
             imt_per = imt.period
