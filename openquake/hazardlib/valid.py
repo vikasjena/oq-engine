@@ -647,9 +647,9 @@ def intensity_measure_types(value):
     :returns: non-empty list of Intensity Measure Type objects
 
     >>> intensity_measure_types('PGA')
-    ['PGA']
+    ['PGA()']
     >>> intensity_measure_types('PGA, SA(1.00)')
-    ['PGA', 'SA(1.0)']
+    ['PGA()', 'SA(1.0)']
     >>> intensity_measure_types('SA(0.1), SA(0.10)')
     Traceback (most recent call last):
       ...

@@ -40,7 +40,7 @@ class IMTtuple(tuple):
         SA(0.1, 4)
         """
         s = string.strip()
-        if s[-1] != ')':
+        if s[-1] != ')' and not params:
             # no parens, PGA is considered the same as PGA()
             return cls((s,))
         prefix, rest = s.split('(', 1)
